@@ -12,7 +12,7 @@
     <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext x='50%25' y='50%25' font-size='80' text-anchor='middle' dominant-baseline='central'%3E🗓️%3C/text%3E%3C/svg%3E">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-</head>
+    </head>
 <body>
     <div id="app-wrapper">
         <div id="container">
@@ -32,7 +32,13 @@
                 <div class="progress-bar-fill" style="width: 0%;"></div>
             </div>
             <button id="settingsButton" class="settings-btn">⚙️ Configuración</button>
-        </div>
+            
+            <div id="authContainer">
+                <p id="userStatus" class="user-status">No hay sesión iniciada.</p>
+                <button id="googleSignInButton" class="action-button primary-button">Iniciar Sesión con Google</button>
+                <button id="signOutButton" class="action-button primary-button hide">Cerrar Sesión</button>
+            </div>
+            </div>
     </div>
 
     <div id="checklistModal" class="modal-backdrop hide">
@@ -72,21 +78,22 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
     <script>
-        // Tus credenciales de configuración de Firebase van aquí
+        // TU CONFIGURACIÓN DE FIREBASE VA AQUÍ
+        // ¡REEMPLAZA ESTOS VALORES CON LOS QUE OBTUVISTE DE TU CONSOLA DE FIREBASE!
         const firebaseConfig = {
-		apiKey: "AIzaSyBlBkohGWO6rh3RfIa2Cr-2i6hXccgl5Cs",
-		authDomain: "mi-calendario-de-contenido.firebaseapp.com",
-		projectId: "mi-calendario-de-contenido",
-		storageBucket: "mi-calendario-de-contenido.firebasestorage.app",
-		messagingSenderId: "19719497381",
-		appId: "1:19719497381:web:f04a562f08b9af49bb8f4c",
-		measurementId: "G-X0XKKXQRZQ"
+            apiKey: "AIzaSyBlBkohGWO6rh3RfIa2Cr-2i6hXccgl5Cs", // Ejemplo: "AIzaSyC0aBcD1eF2gH3iJ4kL5mN6oP7qR8sT9uV0wX1"
+            authDomain: "mi-calendario-de-contenido.firebaseapp.com", // Ejemplo: "mi-calendario-de-contenido.firebaseapp.com"
+            projectId: "mi-calendario-de-contenido", // Ejemplo: "mi-calendario-de-contenido"
+            storageBucket: "mi-calendario-de-contenido.firebasestorage.app", // Ejemplo: "mi-calendario-de-contenido.appspot.com"
+            messagingSenderId: "19719497381", // Ejemplo: "1234567890"
+            appId: "1:19719497381:web:f04a562f08b9af49bb8f4c", // Ejemplo: "1:1234567890:web:abcdef1234567890abcdef"
+            measurementId: "G-X0XKKXQRZQ" // Opcional, si no usas Google Analytics
         };
 
         // Inicializa Firebase
         const app = firebase.initializeApp(firebaseConfig);
-        const auth = app.auth(); // Acceso a la autenticación
-        const db = app.firestore(); // Acceso a Firestore (base de datos)
+        const auth = app.auth();       // Objeto de autenticación de Firebase
+        const db = app.firestore();    // Objeto de la base de datos Firestore de Firebase
     </script>
 
     <script src="script.js"></script>

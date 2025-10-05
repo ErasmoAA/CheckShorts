@@ -2,8 +2,8 @@ let nav = 0;
 let clickedDate = null;
 let channels = [];
 let shortsPerChannel = 2; // Valor por defecto
-// dailyProgress ahora almacenará un objeto para cada día, con el array de booleanos Y el shortsPerChannel con el que se creó ese progreso
-let dailyProgress = {}; // { 'YYYY-MM-DD': { progress: [true, false], shortsNum: 2, channelsNum: 4 } }
+let dailyProgress = {}; 
+let currentUser = null; // NUEVO: Para almacenar el usuario actual
 
 // Elementos del DOM
 const calendar = document.getElementById('calendar');
@@ -22,23 +22,122 @@ const dailyProgressText = document.getElementById('dailyProgressText');
 const weeklyProgressBarFill = document.querySelector('#weeklyProgressBar .progress-bar-fill');
 const weeklyProgressText = document.getElementById('weeklyProgressText');
 
-// --- MANEJO DE DATOS (localStorage) ---
-function saveData() {
-    localStorage.setItem('myContentCalendarChannels', JSON.stringify(channels));
-    localStorage.setItem('myContentCalendarShortsNum', shortsPerChannel); // Guardar el número actual de shorts
-    localStorage.setItem('myContentCalendarProgress', JSON.stringify(dailyProgress));
+// NUEVOS elementos del DOM para autenticación
+const authContainer = document.getElementById('authContainer');
+const userStatus = document.getElementById('userStatus');
+const googleSignInButton = document.getElementById('googleSignInButton');
+const signOutButton = document.getElementById('signOutButton');
+
+// --- MANEJO DE DATOS (Firebase Firestore) ---
+async function saveData() {
+    if (!currentUser) {
+        console.warn("No hay usuario autenticado. Los datos no se guardarán en la nube.");
+        // Seguir guardando en localStorage como respaldo temporal si no hay usuario
+        localStorage.setItem('myContentCalendarChannels', JSON.stringify(channels));
+        localStorage.setItem('myContentCalendarShortsNum', shortsPerChannel);
+        localStorage.setItem('myContentCalendarProgress', JSON.stringify(dailyProgress));
+        return;
+    }
+
+    const userDocRef = db.collection('users').doc(currentUser.uid);
+    try {
+        await userDocRef.set({
+            channels: channels,
+            shortsPerChannel: shortsPerChannel,
+            dailyProgress: dailyProgress // Guardamos todo el objeto de progreso
+        });
+        console.log("Datos guardados en Firestore.");
+    } catch (e) {
+        console.error("Error al guardar en Firestore:", e);
+        alert("Error al guardar los datos en la nube. Inténtalo de nuevo.");
+    }
 }
 
-function loadData() {
-    const channelsData = localStorage.getItem('myContentCalendarChannels');
-    const shortsNumData = localStorage.getItem('myContentCalendarShortsNum');
-    const progressData = localStorage.getItem('myContentCalendarProgress');
+async function loadData() {
+    // Cargar siempre de localStorage primero (para la primera carga o si no hay usuario)
+    const localChannelsData = localStorage.getItem('myContentCalendarChannels');
+    const localShortsNumData = localStorage.getItem('myContentCalendarShortsNum');
+    const localProgressData = localStorage.getItem('myContentCalendarProgress');
     
-    channels = channelsData ? JSON.parse(channelsData) : [];
-    shortsPerChannel = shortsNumData ? parseInt(shortsNumData, 10) : 2;
-    dailyProgress = progressData ? JSON.parse(progressData) : {};
+    channels = localChannelsData ? JSON.parse(localChannelsData) : [];
+    shortsPerChannel = localShortsNumData ? parseInt(localShortsNumData, 10) : 2;
+    dailyProgress = localProgressData ? JSON.parse(localProgressData) : {};
+    
+    shortsPerChannelInput.value = shortsPerChannel;
 
-    shortsPerChannelInput.value = shortsPerChannel; // Actualizar el input
+    if (!currentUser) {
+        console.log("No hay usuario autenticado. Cargando datos de localStorage.");
+        renderChannelList();
+        renderCalendar();
+        return;
+    }
+
+    const userDocRef = db.collection('users').doc(currentUser.uid);
+    try {
+        const doc = await userDocRef.get();
+        if (doc.exists) {
+            const data = doc.data();
+            channels = data.channels || [];
+            shortsPerChannel = data.shortsPerChannel || 2;
+            dailyProgress = data.dailyProgress || {};
+            console.log("Datos cargados de Firestore.");
+            // También actualizamos localStorage con los datos de la nube
+            localStorage.setItem('myContentCalendarChannels', JSON.stringify(channels));
+            localStorage.setItem('myContentCalendarShortsNum', shortsPerChannel);
+            localStorage.setItem('myContentCalendarProgress', JSON.stringify(dailyProgress));
+        } else {
+            console.log("No hay datos para este usuario en Firestore. Usando datos locales o por defecto.");
+            // Si el usuario se loguea por primera vez, subimos sus datos actuales de localStorage
+            if (channels.length > 0 || shortsPerChannel !== 2 || Object.keys(dailyProgress).length > 0) {
+                console.log("Subiendo datos locales a Firestore por primera vez.");
+                saveData(); 
+            }
+        }
+    } catch (e) {
+        console.error("Error al cargar de Firestore:", e);
+        alert("Error al cargar los datos de la nube. Usando datos locales.");
+    } finally {
+        shortsPerChannelInput.value = shortsPerChannel;
+        renderChannelList();
+        renderCalendar();
+    }
+}
+
+// --- AUTENTICACIÓN (Google Sign-In) ---
+function handleAuthStatus(user) {
+    if (user) {
+        currentUser = user;
+        userStatus.innerText = `Sesión iniciada como: ${user.displayName || user.email}`;
+        googleSignInButton.classList.add('hide');
+        signOutButton.classList.remove('hide');
+        loadData(); // Cargar datos del usuario logueado
+    } else {
+        currentUser = null;
+        userStatus.innerText = 'No hay sesión iniciada.';
+        googleSignInButton.classList.remove('hide');
+        signOutButton.classList.add('hide');
+        loadData(); // Cargar datos locales si no hay usuario
+    }
+}
+
+async function signInWithGoogle() {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    try {
+        await auth.signInWithPopup(provider);
+    } catch (error) {
+        console.error("Error al iniciar sesión con Google:", error);
+        alert("Error al iniciar sesión: " + error.message);
+    }
+}
+
+async function signOutGoogle() {
+    try {
+        await auth.signOut();
+        alert("Sesión cerrada correctamente.");
+    } catch (error) {
+        console.error("Error al cerrar sesión:", error);
+        alert("Error al cerrar sesión: " + error.message);
+    }
 }
 
 // --- MODAL DE CONFIGURACIÓN ---
@@ -287,13 +386,15 @@ function updateWeeklyProgressBar() {
 
 // --- INICIALIZACIÓN Y EVENTOS ---
 function init() {
-    loadData();
+    // Escuchar cambios en el estado de autenticación de Firebase
+    auth.onAuthStateChanged(handleAuthStatus);
 
-    if (channels.length === 0) {
-        setupModal.classList.remove('hide');
-    }
-    renderChannelList();
-    renderCalendar();
+    // No llamar a loadData() directamente aquí, se llamará desde handleAuthStatus
+    // loadData(); 
+
+    // Mover el renderizado de la lista de canales y calendario para que se ejecuten después de cargar los datos
+    // renderChannelList();
+    // renderCalendar();
 
     addChannelForm.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -309,6 +410,10 @@ function init() {
     closeChecklistButton.addEventListener('click', () => checklistModal.classList.add('hide'));
     document.getElementById('backButton').addEventListener('click', () => { nav--; renderCalendar(); });
     document.getElementById('nextButton').addEventListener('click', () => { nav++; renderCalendar(); });
+
+    // NUEVOS EVENTOS DE AUTENTICACIÓN
+    googleSignInButton.addEventListener('click', signInWithGoogle);
+    signOutButton.addEventListener('click', signOutGoogle);
 }
 
 init();
