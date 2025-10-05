@@ -523,3 +523,38 @@ body {
     color: var(--text-color-primary);
     box-sizing: border-box;
 }
+/* --- ESTILOS PARA AUTENTICACIÓN --- */
+#authContainer {
+    text-align: center;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.user-status {
+    font-size: 0.9em;
+    color: var(--text-color-secondary);
+    margin-bottom: 5px;
+}
+
+#googleSignInButton,
+#signOutButton {
+    padding: 10px 15px;
+    font-size: 0.9em;
+    background-color: #4285F4; /* Color de Google */
+    color: white;
+    border-radius: 8px;
+}
+
+#googleSignInButton:hover,
+#signOutButton:hover {
+    background-color: #357ae8;
+}
+
+/* Clase de utilidad para ocultar/mostrar elementos */
+.hide {
+    display: none !important;
+}
