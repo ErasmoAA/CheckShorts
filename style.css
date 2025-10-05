@@ -1,0 +1,525 @@
+/* Variables para Modo Claro */
+:root {
+    --bg-color-primary: #e0f2f7; /* Azul muy claro */
+    --bg-color-secondary: rgba(255, 255, 255, 0.6); /* Blanco semitransparente */
+    --text-color-primary: #2c3e50; /* Azul oscuro */
+    --text-color-secondary: #555;
+    --accent-color: #3498db; /* Azul vibrante */
+    --accent-color-hover: #2980b9;
+    --border-color: rgba(255, 255, 255, 0.3);
+    --shadow-color: rgba(0, 0, 0, 0.1);
+    --complete-color: #2ecc71; /* Verde */
+    --in-progress-color: #f39c12; /* Naranja */
+    --error-color: #e74c3c; /* Rojo */
+}
+
+/* Variables para Modo Oscuro */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg-color-primary: #2c3e50; /* Azul muy oscuro */
+        --bg-color-secondary: rgba(44, 62, 80, 0.6); /* Azul oscuro semitransparente */
+        --text-color-primary: #ecf0f1; /* Blanco grisáceo */
+        --text-color-secondary: #bdc3c7;
+        --accent-color: #3498db;
+        --accent-color-hover: #2980b9;
+        --border-color: rgba(255, 255, 255, 0.1);
+        --shadow-color: rgba(0, 0, 0, 0.3);
+        --complete-color: #27ae60;
+        --in-progress-color: #e67e22;
+        --error-color: #c0392b;
+    }
+}
+
+/* Base Styles */
+body {
+    font-family: 'Poppins', sans-serif;
+    margin: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: var(--bg-color-primary);
+    color: var(--text-color-primary);
+    transition: background-color 0.3s ease, color 0.3s ease;
+    overflow-x: hidden; /* Evita scroll horizontal */
+}
+
+#app-wrapper {
+    width: 100%;
+    max-width: 500px; /* Ancho máximo para el móvil */
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+#container {
+    background-color: var(--bg-color-secondary);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    box-shadow: 0 8px 30px var(--shadow-color);
+    padding: 25px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* Header */
+#header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#monthDisplay {
+    font-size: 1.6em;
+    font-weight: 700;
+    color: var(--accent-color);
+    text-transform: capitalize;
+}
+
+.nav-buttons {
+    display: flex;
+    gap: 10px;
+}
+
+.icon-button {
+    background-color: var(--accent-color);
+    color: var(--text-color-primary);
+    border: none;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    font-size: 1.2em;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: background-color 0.2s, transform 0.2s;
+    box-shadow: 0 2px 5px var(--shadow-color);
+}
+.icon-button:hover {
+    background-color: var(--accent-color-hover);
+    transform: translateY(-2px);
+}
+
+/* Weekdays */
+#weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    text-align: center;
+    font-weight: 600;
+    color: var(--text-color-secondary);
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+/* Calendar */
+#calendar {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 8px;
+}
+
+.day {
+    aspect-ratio: 1 / 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    font-size: 0.9em;
+    cursor: pointer;
+    border-radius: 50%; /* Más redondo */
+    transition: background-color 0.2s, transform 0.2s;
+    position: relative;
+    overflow: hidden;
+}
+
+.day:not(.padding) {
+    background-color: rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--border-color);
+    box-shadow: inset 0 0 5px rgba(0,0,0,0.05);
+}
+.day:not(.padding):hover {
+    background-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-2px);
+}
+
+.day .day-number {
+    font-weight: 600;
+    position: relative;
+    z-index: 1; /* Para que el número esté encima del progreso */
+}
+
+.day.current-day {
+    border: 2px solid var(--accent-color);
+    box-shadow: 0 0 10px rgba(52, 152, 219, 0.5);
+}
+.day.current-day .day-number {
+    color: var(--accent-color);
+}
+
+
+/* Progress Indicator (new animated fill) */
+.day .progress-circle {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: var(--in-progress-color); /* Color por defecto */
+    border-radius: 50%;
+    transform: scaleY(0); /* Empieza vacío */
+    transform-origin: bottom;
+    transition: transform 0.3s ease;
+    z-index: 0; /* Detrás del número */
+}
+
+.day.progress-0 .progress-circle { transform: scaleY(0); background-color: transparent; }
+.day.progress-1 .progress-circle { transform: scaleY(0.125); }
+.day.progress-2 .progress-circle { transform: scaleY(0.25); }
+.day.progress-3 .progress-circle { transform: scaleY(0.375); }
+.day.progress-4 .progress-circle { transform: scaleY(0.5); }
+.day.progress-5 .progress-circle { transform: scaleY(0.625); }
+.day.progress-6 .progress-circle { transform: scaleY(0.75); }
+.day.progress-7 .progress-circle { transform: scaleY(0.875); }
+.day.progress-8 .progress-circle { 
+    transform: scaleY(1); 
+    background-color: var(--complete-color); /* Verde cuando está completo */
+}
+.day.progress-0 .progress-circle { background-color: transparent; } /* Asegura que no haya color si no hay progreso */
+
+
+/* Progress Bars */
+.progress-bar-container {
+    width: 100%;
+    background-color: rgba(0,0,0,0.1);
+    border-radius: 10px;
+    height: 25px;
+    overflow: hidden;
+    position: relative;
+    margin-top: 10px;
+    box-shadow: inset 0 1px 3px var(--shadow-color);
+}
+.progress-bar-container.small-progress {
+    height: 20px;
+    margin-bottom: 20px;
+}
+
+.progress-bar-label {
+    position: absolute;
+    width: 100%;
+    text-align: center;
+    line-height: 25px;
+    font-size: 0.85em;
+    font-weight: 500;
+    color: var(--text-color-primary);
+    z-index: 1;
+    text-shadow: 0 0 2px var(--shadow-color);
+}
+.progress-bar-container.small-progress .progress-bar-label {
+    line-height: 20px;
+    font-size: 0.75em;
+}
+
+
+.progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-color), var(--complete-color));
+    width: 0%; /* Controlado por JS */
+    border-radius: 10px;
+    transition: width 0.5s ease-out;
+}
+
+/* MODAL STYLES */
+.modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.4); /* Sutil oscurecimiento */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+.modal-backdrop:not(.hide) {
+    opacity: 1;
+    visibility: visible;
+}
+
+.modal-content {
+    background-color: var(--bg-color-secondary);
+    backdrop-filter: blur(15px);
+    border: 1px solid var(--border-color);
+    padding: 30px;
+    border-radius: 20px;
+    width: 90%;
+    max-width: 450px;
+    box-shadow: 0 10px 40px var(--shadow-color);
+    transform: translateY(20px);
+    opacity: 0;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+}
+.modal-backdrop:not(.hide) .modal-content {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+.modal-content h3 {
+    margin-top: 0;
+    color: var(--accent-color);
+    text-align: center;
+    font-size: 1.4em;
+    font-weight: 700;
+    margin-bottom: 25px;
+}
+
+/* Form inputs */
+#setupForm {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+#setupForm input {
+    padding: 12px 15px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    font-size: 1em;
+    background-color: rgba(255, 255, 255, 0.1);
+    color: var(--text-color-primary);
+    transition: border-color 0.2s, background-color 0.2s;
+}
+#setupForm input::placeholder {
+    color: var(--text-color-secondary);
+    opacity: 0.7;
+}
+#setupForm input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    background-color: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.3);
+}
+
+/* Action Buttons */
+.action-button {
+    background-color: var(--accent-color);
+    color: var(--text-color-primary); /* Texto oscuro para contraste */
+    border: none;
+    padding: 12px 20px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 1em;
+    font-weight: 600;
+    margin-top: 25px;
+    transition: background-color 0.2s, transform 0.2s;
+    box-shadow: 0 4px 10px var(--shadow-color);
+    width: 100%;
+}
+.action-button:hover {
+    background-color: var(--accent-color-hover);
+    transform: translateY(-2px);
+}
+.action-button.primary-button {
+    background-color: var(--accent-color);
+}
+.action-button.primary-button:hover {
+    background-color: var(--accent-color-hover);
+}
+.action-button#closeChecklistButton {
+    background-color: var(--error-color);
+    color: var(--text-color-primary);
+}
+.action-button#closeChecklistButton:hover {
+    background-color: #c0392b;
+}
+
+/* Checklist specific styles */
+#checklist-container {
+    margin-top: 20px;
+    max-height: 250px; /* Para que sea scrollable si hay muchos */
+    overflow-y: auto;
+    padding-right: 10px; /* Para el scrollbar */
+}
+.channel-group {
+    background-color: rgba(0,0,0,0.05);
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 15px;
+    border: 1px solid var(--border-color);
+}
+.channel-group h4 {
+    margin: 0 0 12px 0;
+    color: var(--text-color-primary);
+    font-size: 1.1em;
+    font-weight: 600;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 8px;
+}
+.checklist-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+    font-size: 0.95em;
+}
+.checklist-item input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--text-color-secondary);
+    border-radius: 5px;
+    margin-right: 12px;
+    cursor: pointer;
+    position: relative;
+    transition: background-color 0.2s, border-color 0.2s;
+}
+.checklist-item input[type="checkbox"]:checked {
+    background-color: var(--complete-color);
+    border-color: var(--complete-color);
+}
+.checklist-item input[type="checkbox"]:checked::after {
+    content: '✓';
+    color: var(--text-color-primary);
+    font-size: 1.2em;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+.checklist-item label {
+    cursor: pointer;
+    color: var(--text-color-primary);
+}
+
+
+/* --- ESTILOS ADICIONALES PARA LA VERSIÓN DINÁMICA --- */
+
+/* Botón de configuración de canales */
+.settings-btn {
+    background-color: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-color-secondary);
+    padding: 8px 15px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 0.9em;
+    font-weight: 500;
+    margin: 15px auto 0;
+    display: block;
+    transition: background-color 0.2s, color 0.2s;
+}
+.settings-btn:hover {
+    background-color: var(--accent-color);
+    color: var(--text-color-primary);
+    border-color: var(--accent-color);
+}
+
+/* Formulario para añadir canal */
+.form-group {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+.form-group input {
+    flex-grow: 1;
+    padding: 12px 15px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    font-size: 1em;
+    background-color: rgba(255, 255, 255, 0.1);
+    color: var(--text-color-primary);
+}
+.form-group input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    background-color: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.3);
+}
+
+.add-btn {
+    flex-shrink: 0;
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    border: none;
+    background-color: var(--complete-color);
+    color: var(--text-color-primary);
+    font-size: 1.5em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.2s;
+}
+.add-btn:hover {
+    background-color: #27ae60;
+    transform: scale(1.1);
+}
+
+/* Lista de canales */
+#channelList {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 20px 0;
+    max-height: 150px;
+    overflow-y: auto;
+}
+#channelList li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    background-color: rgba(0,0,0,0.05);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    font-size: 1em;
+}
+.delete-channel-btn {
+    background-color: var(--error-color);
+    color: var(--text-color-primary);
+    border: none;
+    border-radius: 50%;
+    width: 25px;
+    height: 25px;
+    font-size: 0.9em;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    font-weight: bold;
+}
+.delete-channel-btn:hover {
+    background-color: #c0392b;
+}
+
+/* Configuración general */
+.config-section {
+    background-color: rgba(0,0,0,0.05);
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 20px;
+    border: 1px solid var(--border-color);
+}
+.config-section p {
+    margin: 0 0 10px 0;
+    font-weight: 500;
+    color: var(--text-color-secondary);
+}
+.config-section label {
+    display: block;
+    margin-bottom: 10px;
+    font-weight: 500;
+    color: var(--text-color-secondary);
+}
+.config-section input[type="number"] {
+    width: 100%;
+    padding: 12px 15px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    font-size: 1em;
+    background-color: rgba(255, 255, 255, 0.1);
+    color: var(--text-color-primary);
+    box-sizing: border-box;
+}
