@@ -1,3 +1,7 @@
+// ===============================
+// scripts.js (archivo completo)
+// ===============================
+
 // --- VARIABLES GLOBALES Y SELECTORES ---
 let nav = 0;                 // 0 = mes actual, 1 = siguiente mes, -1 = anterior
 let clicked = null;
@@ -35,7 +39,7 @@ const closeChecklistButton = document.getElementById('closeChecklistButton');
 const closeAchievementsButton = document.getElementById('closeAchievementsButton');
 
 
-// --- HELPERS CORRECTOS DE CONTEO ---
+// --- HELPERS DE CONTEO Y UTILIDAD ---
 function countDoneStatuses(dayData) {
   // dayData: { [channelName]: { short_0: 'done'|'pending'|'fail', ... }, ... }
   if (!dayData || typeof dayData !== 'object') return 0;
@@ -48,6 +52,181 @@ function countDoneStatuses(dayData) {
     }
   }
   return total;
+}
+
+// ID simple para canales nuevos o migrados
+function genId() {
+  return 'ch_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+}
+
+// Obtiene nombres de canales presentes en el calendario pero NO en `channels`
+function getOrphanChannelNames() {
+  const inCalendar = new Set();
+  const valid = (n) => {
+    const s = (n ?? '').toString().trim();
+    return s && s.toLowerCase() !== 'undefined';
+  };
+  if (userData?.calendar && typeof userData.calendar === 'object') {
+    for (const dateKey of Object.keys(userData.calendar)) {
+      const day = userData.calendar[dateKey];
+      if (!day || typeof day !== 'object') continue;
+      for (const ch of Object.keys(day)) {
+        if (valid(ch)) inCalendar.add(ch);
+      }
+    }
+  }
+  const inChannels = new Set((channels || []).map(c => c.name));
+  return [...inCalendar].filter(name => !inChannels.has(name));
+}
+
+/**
+ * Migra y repara userData:
+ * - Normaliza channels (strings -> {id, name})
+ * - Añade canales detectados desde el calendario (huérfanos)
+ * - Elimina la llave 'undefined' del calendario
+ * - Guarda si hubo cambios
+ */
+async function migrateAndRepairUserData() {
+  if (!userData) return;
+
+  let changed = false;
+
+  // 1) Normalizar channels
+  const original = Array.isArray(userData.channels) ? userData.channels : [];
+  const normalized = [];
+  const seen = new Set();
+
+  const pushIfNew = (rawName) => {
+    const name = (rawName ?? '').toString().trim();
+    if (!name || name.toLowerCase() === 'undefined') return;
+    const key = name.toLowerCase();
+    if (seen.has(key)) return;
+    normalized.push({ id: genId(), name });
+    seen.add(key);
+  };
+
+  for (const item of original) {
+    if (typeof item === 'string') {
+      pushIfNew(item);
+      changed = true;
+    } else if (item && typeof item === 'object') {
+      const name = (item.name ?? item.channel ?? '').toString().trim();
+      if (name) {
+        const key = name.toLowerCase();
+        if (!seen.has(key)) {
+          normalized.push({ id: item.id || genId(), name });
+          seen.add(key);
+        }
+      } else {
+        // objeto sin nombre
+        changed = true;
+      }
+    }
+  }
+
+  // 2) Limpiar calendario y recolectar huérfanos
+  if (userData.calendar && typeof userData.calendar === 'object') {
+    for (const dateKey of Object.keys(userData.calendar)) {
+      const day = userData.calendar[dateKey];
+      if (!day || typeof day !== 'object') continue;
+
+      // borrar explícitamente la llave 'undefined'
+      if (Object.prototype.hasOwnProperty.call(day, 'undefined')) {
+        delete day['undefined'];
+        changed = true;
+      }
+
+      // agregar canales detectados en el calendario
+      for (const channelName of Object.keys(day)) {
+        pushIfNew(channelName);
+      }
+    }
+  }
+
+  // 3) Persistir si cambió algo
+  if (changed || normalized.length !== original.length) {
+    userData.channels = normalized;
+    channels = normalized;
+    await saveData();
+  } else {
+    channels = original;
+  }
+}
+
+/**
+ * Purga del calendario todas las entradas de canales que NO estén en `channels`
+ * y también quita la llave 'undefined'. Útil tras eliminar canales en Configuración.
+ */
+async function purgeOrphanChannelsFromCalendar() {
+  if (!userData?.calendar) return;
+  const keepNames = new Set((channels || []).map(c => c.name));
+  let changed = false;
+
+  for (const dateKey of Object.keys(userData.calendar)) {
+    const day = userData.calendar[dateKey];
+    if (!day || typeof day !== 'object') continue;
+
+    if ('undefined' in day) {
+      delete day['undefined'];
+      changed = true;
+    }
+    for (const key of Object.keys(day)) {
+      if (!keepNames.has(key)) {
+        delete day[key];
+        changed = true;
+      }
+    }
+  }
+
+  if (changed) {
+    await saveData();
+    renderCalendar();
+    updateSettingsExtras();
+  }
+}
+
+/**
+ * Inserta/actualiza UI adicional en el modal de Configuración:
+ * - Contador de canales
+ * - Contador de huérfanos detectados en calendario
+ * - Botón "Eliminar canales huérfanos del calendario"
+ */
+function ensureSettingsExtras() {
+  const section = channelList?.closest('.config-section');
+  if (!section) return;
+
+  // Contenedor de barra/estadísticas
+  let stats = document.getElementById('channelStats');
+  if (!stats) {
+    stats = document.createElement('div');
+    stats.id = 'channelStats';
+    stats.style.cssText = 'margin-top:10px;margin-bottom:10px;font-weight:600;opacity:.9;';
+    section.appendChild(stats);
+  }
+
+  // Botón para limpiar huérfanos
+  let cleanBtn = document.getElementById('cleanOrphansButton');
+  if (!cleanBtn) {
+    cleanBtn = document.createElement('button');
+    cleanBtn.id = 'cleanOrphansButton';
+    cleanBtn.className = 'action-button close-button';
+    cleanBtn.textContent = 'Eliminar canales huérfanos del calendario';
+    cleanBtn.style.marginTop = '8px';
+    cleanBtn.addEventListener('click', async () => {
+      await purgeOrphanChannelsFromCalendar();
+      alert('Limpieza completada.');
+    });
+    section.appendChild(cleanBtn);
+  }
+
+  updateSettingsExtras(); // establece los textos iniciales
+}
+
+function updateSettingsExtras() {
+  const stats = document.getElementById('channelStats');
+  if (!stats) return;
+  const orphanCount = getOrphanChannelNames().length;
+  stats.textContent = `Canales: ${channels.length} · Huérfanos en calendario: ${orphanCount}`;
 }
 
 
@@ -106,6 +285,10 @@ async function loadData(uid) {
     const doc = await docRef.get();
     if (doc.exists) {
       userData = doc.data();
+
+      // MIGRACIÓN / REPARACIÓN
+      await migrateAndRepairUserData();
+
       channels = userData.channels || [];
       shortsPerChannelInput.value = userData.shortsPerChannel || 2;
     } else {
@@ -198,7 +381,7 @@ function renderCalendar() {
 
     const dayData = userData?.calendar?.[dateKey];
     const totalForDay = (channels.length || 0) * (userData?.shortsPerChannel || 0);
-    const completedForDay = countDoneStatuses(dayData); // ✅ conteo correcto
+    const completedForDay = countDoneStatuses(dayData);
 
     if (totalForDay > 0) {
       const progressPercentage = (completedForDay / totalForDay) * 100;
@@ -248,11 +431,17 @@ function updateWeeklyProgressBar(completed, total) {
 // --- CANALES ---
 async function addChannel(name) {
   if (!name || !currentUser) return;
-  if (!channels.some(c => c.name === name)) {
-    channels.push({ id: Date.now().toString(), name });
+  name = name.toString().trim();
+  if (!name || name.toLowerCase() === 'undefined') {
+    alert('Nombre de canal no válido.');
+    return;
+  }
+  if (!channels.some(c => c.name.toLowerCase() === name.toLowerCase())) {
+    channels.push({ id: genId(), name });
     await saveData();
     renderChannels();
     renderCalendar();
+    updateSettingsExtras();
   } else {
     alert('Este canal ya existe.');
   }
@@ -272,6 +461,7 @@ async function removeChannel(name) {
   await saveData();
   renderChannels();
   renderCalendar();
+  updateSettingsExtras();
 }
 
 function renderChannels() {
@@ -286,7 +476,7 @@ function renderChannels() {
       const li = document.createElement('li');
       li.innerHTML = `
         <span>${channel.name}</span>
-        <button class="remove-btn">-</button>
+        <button class="remove-btn" title="Eliminar">-</button>
       `;
       li.querySelector('.remove-btn').addEventListener('click', () => removeChannel(channel.name));
       channelList.appendChild(li);
@@ -400,8 +590,7 @@ async function calculateAndDisplayStreak() {
   const todayDateKey = today.toISOString().split('T')[0];
 
   const totalExpectedToday = (channels.length || 0) * (userData.shortsPerChannel || 0);
-  const completedToday = countDoneStatuses(userData.calendar?.[todayDateKey]); // ✅
-
+  const completedToday = countDoneStatuses(userData.calendar?.[todayDateKey]);
   const isTodayComplete = totalExpectedToday > 0 && completedToday === totalExpectedToday;
 
   let streakCount = 0;
@@ -415,7 +604,7 @@ async function calculateAndDisplayStreak() {
   while (true) {
     const dateKey = checkDate.toISOString().split('T')[0];
     const totalExpected = (channels.length || 0) * (userData.shortsPerChannel || 0);
-    const completed = countDoneStatuses(userData.calendar?.[dateKey]); // ✅
+    const completed = countDoneStatuses(userData.calendar?.[dateKey]);
 
     if (totalExpected > 0 && completed === totalExpected) {
       streakCount++;
@@ -590,7 +779,9 @@ function init() {
   settingsButton.addEventListener('click', () => {
     setupModal.classList.remove('hide');
     renderChannels();
+    ensureSettingsExtras(); // añade UI extra y actualiza contadores
   });
+
   closeSetupButton.addEventListener('click', () => setupModal.classList.add('hide'));
   closeChecklistButton.addEventListener('click', () => checklistModal.classList.add('hide'));
 
