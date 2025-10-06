@@ -1,5 +1,5 @@
 // ===============================
-// scripts.js (archivo completo)
+// scripts.js (estados: pending / in_progress / done)
 // ===============================
 
 // --- VARIABLES GLOBALES Y SELECTORES ---
@@ -41,7 +41,7 @@ const closeAchievementsButton = document.getElementById('closeAchievementsButton
 
 // --- HELPERS DE CONTEO Y UTILIDAD ---
 function countDoneStatuses(dayData) {
-  // dayData: { [channelName]: { short_0: 'done'|'pending'|'fail', ... }, ... }
+  // dayData: { [channelName]: { short_0: 'done'|'pending'|'in_progress', ... } }
   if (!dayData || typeof dayData !== 'object') return 0;
   let total = 0;
   for (const channelMap of Object.values(dayData)) {
@@ -52,6 +52,19 @@ function countDoneStatuses(dayData) {
     }
   }
   return total;
+}
+
+// ¿Existe algún short "en proceso" en el día?
+function hasInProgress(dayData) {
+  if (!dayData || typeof dayData !== 'object') return false;
+  for (const channelMap of Object.values(dayData)) {
+    if (channelMap && typeof channelMap === 'object') {
+      for (const status of Object.values(channelMap)) {
+        if (status === 'in_progress') return true;
+      }
+    }
+  }
+  return false;
 }
 
 // ID simple para canales nuevos o migrados
@@ -84,6 +97,7 @@ function getOrphanChannelNames() {
  * - Normaliza channels (strings -> {id, name})
  * - Añade canales detectados desde el calendario (huérfanos)
  * - Elimina la llave 'undefined' del calendario
+ * - Convierte estados viejos: 'fail' -> 'pending'
  * - Guarda si hubo cambios
  */
 async function migrateAndRepairUserData() {
@@ -118,13 +132,12 @@ async function migrateAndRepairUserData() {
           seen.add(key);
         }
       } else {
-        // objeto sin nombre
         changed = true;
       }
     }
   }
 
-  // 2) Limpiar calendario y recolectar huérfanos
+  // 2) Limpiar calendario, migrar estados y recolectar huérfanos
   if (userData.calendar && typeof userData.calendar === 'object') {
     for (const dateKey of Object.keys(userData.calendar)) {
       const day = userData.calendar[dateKey];
@@ -136,9 +149,25 @@ async function migrateAndRepairUserData() {
         changed = true;
       }
 
-      // agregar canales detectados en el calendario
       for (const channelName of Object.keys(day)) {
         pushIfNew(channelName);
+
+        const items = day[channelName];
+        if (items && typeof items === 'object') {
+          for (const sId of Object.keys(items)) {
+            const s = items[sId];
+            // migración de estados
+            if (s === 'fail') {           // viejo "no realizado" -> ahora "no hecho"
+              items[sId] = 'pending';
+              changed = true;
+            }
+            // normalizar variantes raras
+            if (s === 'inprogress') {
+              items[sId] = 'in_progress';
+              changed = true;
+            }
+          }
+        }
       }
     }
   }
@@ -195,7 +224,6 @@ function ensureSettingsExtras() {
   const section = channelList?.closest('.config-section');
   if (!section) return;
 
-  // Contenedor de barra/estadísticas
   let stats = document.getElementById('channelStats');
   if (!stats) {
     stats = document.createElement('div');
@@ -204,7 +232,6 @@ function ensureSettingsExtras() {
     section.appendChild(stats);
   }
 
-  // Botón para limpiar huérfanos
   let cleanBtn = document.getElementById('cleanOrphansButton');
   if (!cleanBtn) {
     cleanBtn = document.createElement('button');
@@ -219,7 +246,7 @@ function ensureSettingsExtras() {
     section.appendChild(cleanBtn);
   }
 
-  updateSettingsExtras(); // establece los textos iniciales
+  updateSettingsExtras();
 }
 
 function updateSettingsExtras() {
@@ -382,6 +409,7 @@ function renderCalendar() {
     const dayData = userData?.calendar?.[dateKey];
     const totalForDay = (channels.length || 0) * (userData?.shortsPerChannel || 0);
     const completedForDay = countDoneStatuses(dayData);
+    const inProgressToday = hasInProgress(dayData);
 
     if (totalForDay > 0) {
       const progressPercentage = (completedForDay / totalForDay) * 100;
@@ -393,7 +421,8 @@ function renderCalendar() {
 
       if (progressPercentage === 100) {
         dayBox.classList.add('completed-day');
-      } else if (completedForDay > 0) {
+      } else if (completedForDay > 0 || inProgressToday) {
+        // Si hay en-proceso pero aún 0 completados, también marcamos como parcial
         dayBox.classList.add('partial-day');
       } else {
         dayBox.classList.add('pending-day');
@@ -525,19 +554,19 @@ function openChecklistModal(date) {
         const currentStatus = userData?.calendar?.[date]?.[channel.name]?.[shortId] || 'pending';
         if (currentStatus === 'done') completedShortsToday++;
 
-        const checkboxDiv = document.createElement('div');
-        checkboxDiv.classList.add('checklist-item');
-        checkboxDiv.innerHTML = `
+        const row = document.createElement('div');
+        row.classList.add('checklist-item');
+        row.innerHTML = `
           <span class="item-label">Short ${i + 1}</span>
           <div class="status-buttons">
-            <button class="status-btn done ${currentStatus === 'done' ? 'active' : ''}" data-status="done" title="Completado">✅</button>
-            <button class="status-btn pending ${currentStatus === 'pending' ? 'active' : ''}" data-status="pending" title="Pendiente">⏳</button>
-            <button class="status-btn fail ${currentStatus === 'fail' ? 'active' : ''}" data-status="fail" title="No realizado">❌</button>
+            <button class="status-btn pending ${currentStatus === 'pending' ? 'active' : ''}" data-status="pending" title="No hecho">⏳</button>
+            <button class="status-btn inprogress ${currentStatus === 'in_progress' ? 'active' : ''}" data-status="in_progress" title="En proceso">🛠️</button>
+            <button class="status-btn done ${currentStatus === 'done' ? 'active' : ''}" data-status="done" title="Subido">✅</button>
           </div>
         `;
-        channelDiv.appendChild(checkboxDiv);
+        channelDiv.appendChild(row);
 
-        checkboxDiv.querySelectorAll('.status-btn').forEach(button => {
+        row.querySelectorAll('.status-btn').forEach(button => {
           button.addEventListener('click', async (e) => {
             const newStatus = e.currentTarget.dataset.status;
             await updateShortStatus(date, channel.name, shortId, newStatus);
