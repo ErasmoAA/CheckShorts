@@ -16,6 +16,7 @@
 <body>
     <div id="app-wrapper">
         <div id="container">
+            <!-- Header con navegación -->
             <div id="header">
                 <div id="monthDisplay"></div>
                 <div class="nav-buttons">
@@ -23,24 +24,39 @@
                     <button id="nextButton" class="icon-button">&gt;</button>
                 </div>
             </div>
+
+            <!-- Días de la semana -->
             <div id="weekdays">
-                <div>Dom</div> <div>Lun</div> <div>Mar</div> <div>Mié</div> <div>Jue</div> <div>Vie</div> <div>Sáb</div>
-            </div>
-            <div id="calendar"></div>
-            <div id="weeklyProgressBar" class="progress-bar-container">
-                <div class="progress-bar-label">Semanal: <span id="weeklyProgressText">0/0</span></div>
-                <div class="progress-bar-fill" style="width: 0%;"></div>
-            </div>
-            
-            <button id="settingsButton" class="settings-btn">⚙️ Configuración</button>
-            <button id="achievementsButton" class="settings-btn">🏆 Logros</button>
-            
-            <div id="authContainer">
-                <p id="userStatus" class="user-status">No hay sesión iniciada.</p>
-                <button id="googleSignInButton" class="action-button primary-button">Iniciar Sesión con Google</button>
-                <button id="signOutButton" class="action-button primary-button hide">Cerrar Sesión</button>
+                <div>Dom</div>
+                <div>Lun</div>
+                <div>Mar</div>
+                <div>Mié</div>
+                <div>Jue</div>
+                <div>Vie</div>
+                <div>Sáb</div>
             </div>
 
+            <!-- Calendario principal -->
+            <div id="calendar"></div>
+
+            <!-- Barra de progreso semanal -->
+            <div id="weeklyProgressBar" class="progress-bar-container">
+                <div class="progress-bar-label">Semanal: <span id="weeklyProgressText">0/0</span></div>
+                <div class="progress-bar-fill"></div>
+            </div>
+
+            <!-- Botones de configuración y logros -->
+            <button id="settingsButton" class="settings-btn">⚙️ Configuración</button>
+            <button id="achievementsButton" class="settings-btn">🏆 Logros</button>
+
+            <!-- Contenedor de autenticación -->
+            <div id="authContainer">
+                <p id="userStatus" class="user-status">No hay sesión iniciada.</p>
+                <button id="googleSignInButton" class="action-button google-button">Iniciar Sesión con Google</button>
+                <button id="signOutButton" class="action-button google-button hide">Cerrar Sesión</button>
+            </div>
+
+            <!-- Contador de racha -->
             <div id="streakContainer" class="streak-container">
                 <span class="streak-label">🔥 Racha: </span>
                 <span id="currentStreak" class="streak-value">0 días</span>
@@ -48,18 +64,20 @@
         </div>
     </div>
 
+    <!-- Modal de Checklist Diario -->
     <div id="checklistModal" class="modal-backdrop hide">
         <div class="modal-content">
             <h3 id="checklistTitle"></h3>
             <div id="dailyProgressBar" class="progress-bar-container small-progress">
                 <div class="progress-bar-label"><span id="dailyProgressText">0/0</span> Completados</div>
-                <div class="progress-bar-fill" style="width: 0%;"></div>
+                <div class="progress-bar-fill"></div>
             </div>
             <div id="checklist-container"></div>
-            <button id="closeChecklistButton" class="action-button primary-button">Cerrar</button>
+            <button id="closeChecklistButton" class="action-button close-button">Cerrar</button>
         </div>
     </div>
 
+    <!-- Modal de Configuración -->
     <div id="setupModal" class="modal-backdrop hide">
         <div class="modal-content">
             <h3>Configuración General</h3>
@@ -83,6 +101,7 @@
         </div>
     </div>
 
+    <!-- Modal de Logros -->
     <div id="achievementsModal" class="modal-backdrop hide">
         <div class="modal-content">
             <h3>Tus Logros</h3>
@@ -93,11 +112,16 @@
         </div>
     </div>
     
+    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    
+    <!-- Configuración de Firebase -->
     <script>
-        // ⚠️ REEMPLAZA ESTO CON TUS CREDENCIALES
+        // ⚠️ IMPORTANTE: REEMPLAZA ESTAS CREDENCIALES CON LAS TUYAS
+        // Estas credenciales están expuestas en el código del cliente
+        // Configura las reglas de seguridad de Firebase para proteger tus datos
         const firebaseConfig = {
             apiKey: "AIzaSyBlBkohGWO6rh3RfIa2Cr-2i6hXccgl5Cs",
             authDomain: "mi-calendario-de-contenido.firebaseapp.com",
@@ -108,13 +132,13 @@
             measurementId: "G-X0XKKXQRZQ"
         };
 
-        // Inicializa solo los servicios que usas
+        // Inicializar Firebase
         const app = firebase.initializeApp(firebaseConfig);
         const auth = app.auth();
         const db = app.firestore();
-        // Ya no inicializamos messaging
     </script>
 
+    <!-- Script principal de la aplicación -->
     <script src="script.js"></script>
 </body>
 </html>

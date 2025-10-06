@@ -1,16 +1,20 @@
+/* ========================================
+   VARIABLES CSS PARA TEMAS
+   ======================================== */
+
 /* Variables para Modo Claro */
 :root {
-    --bg-color-primary: #e0f2f7; /* Azul muy claro */
-    --bg-color-secondary: rgba(255, 255, 255, 0.6); /* Blanco semitransparente */
-    --text-color-primary: #2c3e50; /* Azul oscuro */
+    --bg-color-primary: #e0f2f7;
+    --bg-color-secondary: rgba(255, 255, 255, 0.6);
+    --text-color-primary: #2c3e50;
     --text-color-secondary: #555;
-    --accent-color: #3498db; /* Azul vibrante */
+    --accent-color: #3498db;
     --accent-color-hover: #2980b9;
     --border-color: rgba(255, 255, 255, 0.3);
     --shadow-color: rgba(0, 0, 0, 0.1);
-    --complete-color: #2ecc71; /* Verde */
-    --in-progress-color: #f39c12; /* Naranja */
-    --error-color: #e74c3c; /* Rojo */
+    --complete-color: #2ecc71;
+    --in-progress-color: #f39c12;
+    --error-color: #e74c3c;
     --secondary-bg-color: rgba(255, 255, 255, 0.2);
     --shadow-small: 0 4px 6px rgba(0,0,0,0.05);
 }
@@ -18,9 +22,9 @@
 /* Variables para Modo Oscuro */
 @media (prefers-color-scheme: dark) {
     :root {
-        --bg-color-primary: #2c3e50; /* Azul muy oscuro */
-        --bg-color-secondary: rgba(44, 62, 80, 0.6); /* Azul oscuro semitransparente */
-        --text-color-primary: #ecf0f1; /* Blanco grisáceo */
+        --bg-color-primary: #2c3e50;
+        --bg-color-secondary: rgba(44, 62, 80, 0.6);
+        --text-color-primary: #ecf0f1;
         --text-color-secondary: #bdc3c7;
         --accent-color: #3498db;
         --accent-color-hover: #2980b9;
@@ -34,10 +38,18 @@
     }
 }
 
-/* Base Styles */
+/* ========================================
+   ESTILOS BASE
+   ======================================== */
+
+* {
+    box-sizing: border-box;
+}
+
 body {
     font-family: 'Poppins', sans-serif;
     margin: 0;
+    padding: 0;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -68,7 +80,10 @@ body {
     gap: 20px;
 }
 
-/* Header */
+/* ========================================
+   HEADER Y NAVEGACIÓN
+   ======================================== */
+
 #header {
     display: flex;
     justify-content: space-between;
@@ -89,7 +104,7 @@ body {
 
 .icon-button {
     background-color: var(--accent-color);
-    color: var(--text-color-primary);
+    color: white;
     border: none;
     border-radius: 50%;
     width: 40px;
@@ -103,12 +118,16 @@ body {
     transition: background-color 0.2s, transform 0.2s;
     box-shadow: 0 2px 5px var(--shadow-color);
 }
+
 .icon-button:hover {
     background-color: var(--accent-color-hover);
     transform: translateY(-2px);
 }
 
-/* Weekdays */
+/* ========================================
+   DÍAS DE LA SEMANA
+   ======================================== */
+
 #weekdays {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
@@ -119,7 +138,14 @@ body {
     border-bottom: 1px solid var(--border-color);
 }
 
-/* Calendar */
+#weekdays div {
+    font-size: 0.9em;
+}
+
+/* ========================================
+   CALENDARIO
+   ======================================== */
+
 #calendar {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
@@ -129,7 +155,6 @@ body {
 .day {
     aspect-ratio: 1 / 1;
     display: flex;
-    flex-direction: column;
     justify-content: center;
     align-items: center;
     font-size: 0.9em;
@@ -138,6 +163,7 @@ body {
     transition: background-color 0.2s, transform 0.2s;
     position: relative;
     overflow: hidden;
+    font-weight: 600;
 }
 
 .day:not(.padding) {
@@ -145,50 +171,55 @@ body {
     border: 1px solid var(--border-color);
     box-shadow: inset 0 0 5px rgba(0,0,0,0.05);
 }
+
 .day:not(.padding):hover {
     background-color: rgba(255, 255, 255, 0.2);
     transform: translateY(-2px);
 }
 
-.day .day-number {
-    font-weight: 600;
-    position: relative;
-    z-index: 1;
+.day.padding {
+    background-color: transparent;
+    cursor: default;
 }
 
+/* Día actual */
 .day.current-day {
     border: 2px solid var(--accent-color);
     box-shadow: 0 0 10px rgba(52, 152, 219, 0.5);
-}
-.day.current-day .day-number {
     color: var(--accent-color);
 }
 
-/* Progress Indicator (animated fill) */
-.day .progress-circle {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
-    transform: scaleY(0);
-    transform-origin: bottom;
-    transition: transform 0.3s ease, background-color 0.3s ease;
-    z-index: 0;
+/* Estados de progreso del día */
+.day.completed-day {
+    background-color: rgba(46, 204, 113, 0.2);
+    border-color: var(--complete-color);
 }
 
-.day.progress-0 .progress-circle { transform: scaleY(0); }
-.day.progress-1 .progress-circle { transform: scaleY(0.125); }
-.day.progress-2 .progress-circle { transform: scaleY(0.25); }
-.day.progress-3 .progress-circle { transform: scaleY(0.375); }
-.day.progress-4 .progress-circle { transform: scaleY(0.5); }
-.day.progress-5 .progress-circle { transform: scaleY(0.625); }
-.day.progress-6 .progress-circle { transform: scaleY(0.75); }
-.day.progress-7 .progress-circle { transform: scaleY(0.875); }
-.day.progress-8 .progress-circle { transform: scaleY(1); }
+.day.partial-day {
+    background-color: rgba(243, 156, 18, 0.2);
+    border-color: var(--in-progress-color);
+}
 
-/* Progress Bars */
+.day.pending-day {
+    background-color: rgba(149, 165, 166, 0.2);
+    border-color: #95a5a6;
+}
+
+/* Barra de progreso dentro del día */
+.day-progress-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--accent-color), var(--complete-color));
+    border-radius: 0 0 50% 50%;
+    transition: width 0.3s ease;
+}
+
+/* ========================================
+   BARRAS DE PROGRESO
+   ======================================== */
+
 .progress-bar-container {
     width: 100%;
     background-color: rgba(0,0,0,0.1);
@@ -199,6 +230,7 @@ body {
     margin-top: 10px;
     box-shadow: inset 0 1px 3px var(--shadow-color);
 }
+
 .progress-bar-container.small-progress {
     height: 20px;
     margin-bottom: 20px;
@@ -215,6 +247,7 @@ body {
     z-index: 1;
     text-shadow: 0 0 2px var(--shadow-color);
 }
+
 .progress-bar-container.small-progress .progress-bar-label {
     line-height: 20px;
     font-size: 0.75em;
@@ -228,14 +261,17 @@ body {
     transition: width 0.5s ease-out;
 }
 
-/* MODAL STYLES */
+/* ========================================
+   MODALES
+   ======================================== */
+
 .modal-backdrop {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0,0,0,0.4);
+    background-color: rgba(0,0,0,0.5);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -244,6 +280,7 @@ body {
     visibility: hidden;
     transition: opacity 0.3s ease, visibility 0.3s ease;
 }
+
 .modal-backdrop:not(.hide) {
     opacity: 1;
     visibility: visible;
@@ -257,77 +294,107 @@ body {
     border-radius: 20px;
     width: 90%;
     max-width: 450px;
+    max-height: 80vh;
+    overflow-y: auto;
     box-shadow: 0 10px 40px var(--shadow-color);
-    transform: translateY(20px);
+    transform: scale(0.9);
     opacity: 0;
     transition: transform 0.3s ease, opacity 0.3s ease;
 }
+
 .modal-backdrop:not(.hide) .modal-content {
-    transform: translateY(0);
+    transform: scale(1);
     opacity: 1;
 }
 
 .modal-content h3 {
-    margin-top: 0;
+    margin: 0 0 25px 0;
     color: var(--accent-color);
     text-align: center;
     font-size: 1.4em;
     font-weight: 700;
-    margin-bottom: 25px;
 }
 
-/* Action Buttons */
+/* ========================================
+   BOTONES GENERALES
+   ======================================== */
+
 .action-button {
     background-color: var(--accent-color);
-    color: var(--text-color-primary);
+    color: white;
     border: none;
     padding: 12px 20px;
     border-radius: 10px;
     cursor: pointer;
     font-size: 1em;
     font-weight: 600;
-    margin-top: 10px; /* Reducido para auth buttons */
+    margin-top: 10px;
     transition: background-color 0.2s, transform 0.2s;
     box-shadow: 0 4px 10px var(--shadow-color);
     width: 100%;
 }
+
 .action-button:hover {
     background-color: var(--accent-color-hover);
     transform: translateY(-2px);
 }
+
 .action-button.primary-button {
     background-color: var(--accent-color);
 }
+
 .action-button.primary-button:hover {
     background-color: var(--accent-color-hover);
 }
-.action-button#closeChecklistButton {
+
+.action-button.close-button {
     background-color: var(--error-color);
     color: white;
 }
-.action-button#closeChecklistButton:hover {
+
+.action-button.close-button:hover {
     background-color: #c0392b;
 }
 
-/* ESTILOS PARA CONFIGURACIÓN */
+.action-button.google-button {
+    background-color: #4285F4;
+    padding: 10px 15px;
+    font-size: 0.9em;
+    margin-top: 5px;
+}
+
+.action-button.google-button:hover {
+    background-color: #357ae8;
+}
+
+/* ========================================
+   BOTÓN DE CONFIGURACIÓN
+   ======================================== */
+
 .settings-btn {
     background-color: transparent;
     border: 1px solid var(--border-color);
     color: var(--text-color-secondary);
-    padding: 8px 15px;
+    padding: 10px 15px;
     border-radius: 10px;
     cursor: pointer;
     font-size: 0.9em;
     font-weight: 500;
-    margin: 0 auto;
+    margin: 5px auto;
     display: block;
     transition: background-color 0.2s, color 0.2s;
+    width: 100%;
 }
+
 .settings-btn:hover {
     background-color: var(--accent-color);
-    color: var(--text-color-primary);
+    color: white;
     border-color: var(--accent-color);
 }
+
+/* ========================================
+   CONFIGURACIÓN
+   ======================================== */
 
 .config-section {
     background-color: rgba(0,0,0,0.05);
@@ -336,12 +403,16 @@ body {
     margin-bottom: 20px;
     border: 1px solid var(--border-color);
 }
-.config-section p, .config-section label {
+
+.config-section p, 
+.config-section label {
     margin: 0 0 10px 0;
     font-weight: 500;
     color: var(--text-color-secondary);
 }
-.config-section input[type="number"], .config-section input[type="text"] {
+
+.config-section input[type="number"], 
+.config-section input[type="text"] {
     width: 100%;
     padding: 12px 15px;
     border: 1px solid var(--border-color);
@@ -350,12 +421,20 @@ body {
     background-color: rgba(255, 255, 255, 0.1);
     color: var(--text-color-primary);
     box-sizing: border-box;
+    font-family: 'Poppins', sans-serif;
+}
+
+.config-section input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
 }
 
 .form-group {
     display: flex;
     gap: 10px;
 }
+
 .add-btn {
     flex-shrink: 0;
     width: 45px;
@@ -363,17 +442,19 @@ body {
     border-radius: 50%;
     border: none;
     background-color: var(--complete-color);
-    color: var(--text-color-primary);
+    color: white;
     font-size: 1.5em;
     font-weight: 600;
     cursor: pointer;
     transition: background-color 0.2s, transform 0.2s;
 }
+
 .add-btn:hover {
     background-color: #27ae60;
     transform: scale(1.1);
 }
 
+/* Lista de canales */
 #channelList {
     list-style: none;
     padding: 0;
@@ -381,33 +462,44 @@ body {
     max-height: 150px;
     overflow-y: auto;
 }
+
 #channelList li {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px;
+    padding: 10px 15px;
     background-color: rgba(0,0,0,0.05);
     border-radius: 8px;
     margin-bottom: 8px;
     font-size: 1em;
+    border: 1px solid var(--border-color);
 }
-.delete-channel-btn {
+
+.remove-btn {
     background-color: var(--error-color);
     color: white;
     border: none;
     border-radius: 50%;
-    width: 25px;
-    height: 25px;
-    font-size: 0.9em;
+    width: 30px;
+    height: 30px;
+    font-size: 1.2em;
     cursor: pointer;
-    transition: background-color 0.2s;
+    transition: background-color 0.2s, transform 0.2s;
     font-weight: bold;
-}
-.delete-channel-btn:hover {
-    background-color: #c0392b;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
-/* ESTILOS PARA AUTENTICACIÓN */
+.remove-btn:hover {
+    background-color: #c0392b;
+    transform: scale(1.1);
+}
+
+/* ========================================
+   AUTENTICACIÓN
+   ======================================== */
+
 #authContainer {
     text-align: center;
     margin-top: 10px;
@@ -415,40 +507,35 @@ body {
     border-top: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 5px;
 }
+
 .user-status {
     font-size: 0.9em;
     color: var(--text-color-secondary);
     margin-bottom: 5px;
 }
-#googleSignInButton, #signOutButton {
-    padding: 10px 15px;
-    font-size: 0.9em;
-    background-color: #4285F4;
-    color: white;
-    border-radius: 8px;
-    margin-top: 0;
-}
-#googleSignInButton:hover, #signOutButton:hover {
-    background-color: #357ae8;
-}
 
-/* ESTILOS PARA ESTADOS DE VIDEO */
+/* ========================================
+   CHECKLIST DIARIO
+   ======================================== */
+
 #checklist-container {
     margin-top: 20px;
-    max-height: 250px;
+    max-height: 300px;
     overflow-y: auto;
     padding-right: 10px;
 }
-.channel-group {
+
+.channel-checklist-group {
     background-color: rgba(0,0,0,0.05);
     border-radius: 10px;
     padding: 15px;
     margin-bottom: 15px;
     border: 1px solid var(--border-color);
 }
-.channel-group h4 {
+
+.channel-checklist-group h4 {
     margin: 0 0 12px 0;
     color: var(--text-color-primary);
     font-size: 1.1em;
@@ -456,76 +543,89 @@ body {
     border-bottom: 1px solid var(--border-color);
     padding-bottom: 8px;
 }
+
 .checklist-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 10px;
-    font-size: 0.95em;
     padding: 8px 0;
     border-bottom: 1px dashed rgba(255, 255, 255, 0.1);
 }
+
 .checklist-item:last-child {
     border-bottom: none;
 }
+
 .item-label {
     flex-grow: 1;
     color: var(--text-color-primary);
     font-weight: 500;
+    font-size: 0.95em;
 }
+
 .status-buttons {
     display: flex;
     gap: 5px;
 }
-.status-button {
-    background-color: var(--text-color-secondary);
+
+.status-btn {
+    background-color: rgba(255, 255, 255, 0.1);
     color: var(--text-color-primary);
-    border: none;
-    padding: 6px 12px;
+    border: 1px solid var(--border-color);
+    padding: 6px 10px;
     border-radius: 8px;
     cursor: pointer;
-    font-size: 0.8em;
-    font-weight: 600;
-    transition: background-color 0.2s, transform 0.1s;
-    white-space: nowrap;
-}
-.status-button:hover {
-    transform: translateY(-1px);
-}
-.status-button.status-Pendiente {
-    background-color: #95a5a6;
-    color: white;
-}
-.status-button.status-Creado {
-    background-color: var(--in-progress-color);
-    color: white;
-}
-.status-button.status-Publicado {
-    background-color: var(--complete-color);
-    color: white;
-}
-.status-button.active-status {
-    box-shadow: 0 0 0 3px var(--accent-color), inset 0 0 5px rgba(0,0,0,0.2);
-    transform: translateY(-1px);
-}
-.day .progress-circle.progress-Publicado {
-    background-color: var(--complete-color);
-}
-.day .progress-circle.progress-Creado {
-    background-color: var(--in-progress-color);
-}
-.day .progress-circle.progress-Pendiente {
-    background-color: #95a5a6;
-}
-.day .progress-circle.progress-none {
-    background-color: transparent;
+    font-size: 1.2em;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-/* ESTILOS PARA EL CONTADOR DE RACHAS */
+.status-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 5px var(--shadow-color);
+}
+
+.status-btn.done {
+    border-color: var(--complete-color);
+}
+
+.status-btn.done.active {
+    background-color: var(--complete-color);
+    color: white;
+    box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.3);
+}
+
+.status-btn.pending {
+    border-color: #95a5a6;
+}
+
+.status-btn.pending.active {
+    background-color: #95a5a6;
+    color: white;
+    box-shadow: 0 0 0 3px rgba(149, 165, 166, 0.3);
+}
+
+.status-btn.fail {
+    border-color: var(--error-color);
+}
+
+.status-btn.fail.active {
+    background-color: var(--error-color);
+    color: white;
+    box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.3);
+}
+
+/* ========================================
+   RACHA
+   ======================================== */
+
 .streak-container {
     text-align: center;
     margin-top: 10px;
-    padding: 10px;
+    padding: 15px;
     background-color: var(--secondary-bg-color);
     border-radius: 12px;
     box-shadow: var(--shadow-small);
@@ -534,18 +634,174 @@ body {
     align-items: center;
     gap: 10px;
 }
+
 .streak-label {
     font-size: 1.1em;
     font-weight: 600;
     color: var(--accent-color);
 }
+
 .streak-value {
     font-size: 1.3em;
     font-weight: 700;
     color: var(--text-color-primary);
 }
 
-/* Clase de utilidad */
+/* ========================================
+   LOGROS
+   ======================================== */
+
+#achievements-container {
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 10px;
+}
+
+.no-achievements {
+    text-align: center;
+    color: var(--text-color-secondary);
+    padding: 30px;
+    font-style: italic;
+}
+
+.achievements-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.achievement-item {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 15px;
+    background: linear-gradient(135deg, rgba(52, 152, 219, 0.1), rgba(155, 89, 182, 0.1));
+    border-radius: 10px;
+    margin-bottom: 12px;
+    border: 1px solid var(--border-color);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.achievement-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px var(--shadow-color);
+}
+
+.achievement-icon {
+    font-size: 2em;
+    flex-shrink: 0;
+}
+
+.achievement-info {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.achievement-title {
+    font-weight: 600;
+    font-size: 1.05em;
+    color: var(--text-color-primary);
+}
+
+.achievement-description {
+    font-size: 0.85em;
+    color: var(--text-color-secondary);
+}
+
+/* ========================================
+   ANIMACIONES
+   ======================================== */
+
+@keyframes slideIn {
+    from {
+        transform: translateX(400px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOut {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(400px);
+        opacity: 0;
+    }
+}
+
+/* ========================================
+   UTILIDADES
+   ======================================== */
+
 .hide {
     display: none !important;
+}
+
+/* ========================================
+   SCROLLBAR PERSONALIZADO
+   ======================================== */
+
+#checklist-container::-webkit-scrollbar,
+#achievements-container::-webkit-scrollbar,
+#channelList::-webkit-scrollbar {
+    width: 6px;
+}
+
+#checklist-container::-webkit-scrollbar-track,
+#achievements-container::-webkit-scrollbar-track,
+#channelList::-webkit-scrollbar-track {
+    background: rgba(0,0,0,0.1);
+    border-radius: 10px;
+}
+
+#checklist-container::-webkit-scrollbar-thumb,
+#achievements-container::-webkit-scrollbar-thumb,
+#channelList::-webkit-scrollbar-thumb {
+    background: var(--accent-color);
+    border-radius: 10px;
+}
+
+#checklist-container::-webkit-scrollbar-thumb:hover,
+#achievements-container::-webkit-scrollbar-thumb:hover,
+#channelList::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-color-hover);
+}
+
+/* ========================================
+   RESPONSIVE
+   ======================================== */
+
+@media (max-width: 480px) {
+    #app-wrapper {
+        padding: 10px;
+    }
+
+    #container {
+        padding: 20px;
+        gap: 15px;
+    }
+
+    #monthDisplay {
+        font-size: 1.3em;
+    }
+
+    .day {
+        font-size: 0.85em;
+    }
+
+    .modal-content {
+        padding: 20px;
+        width: 95%;
+    }
+
+    .status-btn {
+        padding: 5px 8px;
+        font-size: 1em;
+    }
 }

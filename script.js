@@ -1,4 +1,4 @@
-// --- script.js COMPLETO (SIN NOTIFICACIONES) ---
+// --- script.js COMPLETO Y CORREGIDO ---
 
 // --- VARIABLES GLOBALES Y SELECTORES ---
 let nav = 0; // Controla el mes actual (0 = mes actual, 1 = siguiente mes, -1 = mes anterior)
@@ -128,7 +128,6 @@ async function saveData() {
         // Actualizar el userData con los valores actuales del frontend
         userData.channels = channels;
         userData.shortsPerChannel = parseInt(shortsPerChannelInput.value);
-        userData.lastLoginDate = new Date().toISOString().split('T')[0]; // Actualizar última fecha de login
 
         await docRef.set(userData, { merge: true }); // Usar merge para no sobrescribir todo el documento
         console.log("Datos guardados con éxito.");
@@ -172,6 +171,9 @@ function renderCalendar() {
     startOfWeek.setDate(today.getDate() - today.getDay());
     startOfWeek.setHours(0, 0, 0, 0);
 
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 7);
+
     for (let i = 1; i <= paddingDays + daysInMonth; i++) {
         const dayBox = document.createElement('div');
         dayBox.classList.add('day');
@@ -184,10 +186,10 @@ function renderCalendar() {
         if (i > paddingDays) {
             dayBox.innerText = dayNumber;
 
-            // Marcar el día actual
+            // Marcar el día actual con clase en lugar de ID
             const currentDay = new Date(year, month, dayNumber);
             if (currentDay.toDateString() === new Date().toDateString()) {
-                dayBox.id = 'currentDay';
+                dayBox.classList.add('current-day');
             }
 
             // Datos del día del calendario
@@ -197,11 +199,14 @@ function renderCalendar() {
 
             if (totalForDay > 0) {
                 const progressPercentage = (completedForDay / totalForDay) * 100;
+                
+                // Crear barra de progreso del día
                 const progressBar = document.createElement('div');
                 progressBar.classList.add('day-progress-bar');
                 progressBar.style.width = `${progressPercentage}%`;
                 dayBox.appendChild(progressBar);
 
+                // Añadir clases de estado
                 if (progressPercentage === 100) {
                     dayBox.classList.add('completed-day');
                 } else if (completedForDay > 0) {
@@ -211,12 +216,11 @@ function renderCalendar() {
                 }
             }
 
-
             dayBox.addEventListener('click', () => openChecklistModal(dateKey));
 
             // Calcular progreso semanal (solo para la semana actual y si el usuario está logueado)
             if (currentUser) {
-                if (currentDay >= startOfWeek && currentDay < new Date(startOfWeek).setDate(startOfWeek.getDate() + 7)) {
+                if (currentDay >= startOfWeek && currentDay < endOfWeek) {
                     totalVideosThisWeek += totalForDay;
                     completedVideosThisWeek += completedForDay;
                 }
@@ -251,9 +255,11 @@ function updateWeeklyProgressBar(completed, total) {
 async function addChannel(name) {
     if (!name || !currentUser) return;
     if (!channels.some(c => c.name === name)) {
-        channels.push({ id: firebase.firestore.FieldValue.serverTimestamp(), name: name }); // Usar serverTimestamp para un ID único
+        // Usar timestamp como ID único
+        channels.push({ id: Date.now().toString(), name: name });
         await saveData();
         renderChannels();
+        renderCalendar(); // Actualizar calendario para reflejar cambios
     } else {
         alert('Este canal ya existe.');
     }
@@ -262,8 +268,16 @@ async function addChannel(name) {
 async function removeChannel(name) {
     if (!currentUser) return;
     channels = channels.filter(c => c.name !== name);
-    // Opcional: limpiar los datos de este canal del calendario si se elimina
-    // Podría ser complejo, por ahora solo lo removemos de la lista de canales
+    
+    // Opcional: limpiar los datos de este canal del calendario
+    if (userData.calendar) {
+        for (const date in userData.calendar) {
+            if (userData.calendar[date][name]) {
+                delete userData.calendar[date][name];
+            }
+        }
+    }
+    
     await saveData();
     renderChannels();
     renderCalendar(); // Volver a renderizar el calendario para reflejar los cambios
@@ -309,7 +323,7 @@ function openChecklistModal(date) {
         return;
     }
     clicked = date; // Guarda la fecha actual
-    checklistTitle.innerText = `Contenido para ${new Date(date).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`;
+    checklistTitle.innerText = `Contenido para ${new Date(date + 'T00:00:00').toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`;
     checklistContainer.innerHTML = ''; // Limpiar el checklist anterior
 
     const totalExpectedShorts = (channels.length || 0) * (userData?.shortsPerChannel || 0);
@@ -326,23 +340,24 @@ function openChecklistModal(date) {
 
             const numShorts = userData?.shortsPerChannel || 0;
             for (let i = 0; i < numShorts; i++) {
-                const shortId = `${channel.name}_${i}`;
-                const isDone = userData?.calendar?.[date]?.[channel.name]?.[shortId] === 'done';
-                if (isDone) completedShortsToday++;
+                const shortId = `short_${i}`;
+                const currentStatus = userData?.calendar?.[date]?.[channel.name]?.[shortId] || 'pending';
+                
+                if (currentStatus === 'done') completedShortsToday++;
 
                 const checkboxDiv = document.createElement('div');
                 checkboxDiv.classList.add('checklist-item');
                 checkboxDiv.innerHTML = `
-                    <input type="checkbox" id="${date}-${shortId}" ${isDone ? 'checked' : ''}>
-                    <label for="${date}-${shortId}">Short ${i + 1} (${channel.name})</label>
+                    <span class="item-label">Short ${i + 1}</span>
                     <div class="status-buttons">
-                        <button class="status-btn done ${isDone ? 'active' : ''}" data-status="done">✅</button>
-                        <button class="status-btn pending ${!isDone && userData?.calendar?.[date]?.[channel.name]?.[shortId] === 'pending' ? 'active' : ''}" data-status="pending">⏳</button>
-                        <button class="status-btn fail ${!isDone && userData?.calendar?.[date]?.[channel.name]?.[shortId] === 'fail' ? 'active' : ''}" data-status="fail">❌</button>
+                        <button class="status-btn done ${currentStatus === 'done' ? 'active' : ''}" data-status="done" title="Completado">✅</button>
+                        <button class="status-btn pending ${currentStatus === 'pending' ? 'active' : ''}" data-status="pending" title="Pendiente">⏳</button>
+                        <button class="status-btn fail ${currentStatus === 'fail' ? 'active' : ''}" data-status="fail" title="No realizado">❌</button>
                     </div>
                 `;
                 channelDiv.appendChild(checkboxDiv);
 
+                // Event listeners para los botones de estado
                 checkboxDiv.querySelectorAll('.status-btn').forEach(button => {
                     button.addEventListener('click', async (e) => {
                         const newStatus = e.target.dataset.status;
@@ -396,102 +411,126 @@ async function calculateAndDisplayStreak() {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Normalizar a medianoche
-
-    // Asegurarse de que lastLoginDate esté en formato de fecha para comparación
-    let lastLoginDate = new Date(userData.lastLoginDate || '1970-01-01');
-    lastLoginDate.setHours(0, 0, 0, 0);
-
-    const diffTime = Math.abs(today.getTime() - lastLoginDate.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    const totalExpectedToday = (channels.length || 0) * (userData.shortsPerChannel || 0);
     const todayDateKey = today.toISOString().split('T')[0];
-    const completedToday = userData.calendar?.[todayDateKey] ? Object.values(userData.calendar[todayDateKey]).flat().filter(s => s === 'done').length : 0;
 
-    if (diffDays === 0) { // Mismo día, solo actualiza la racha visual si ya se completó
-        if (completedToday === totalExpectedToday && totalExpectedToday > 0) {
-            currentStreakDisplay.innerText = `${userData.streak} días (Hoy completado)`;
+    // Calcular si hoy está completo
+    const totalExpectedToday = (channels.length || 0) * (userData.shortsPerChannel || 0);
+    const completedToday = userData.calendar?.[todayDateKey] ? 
+        Object.values(userData.calendar[todayDateKey]).flat().filter(s => s === 'done').length : 0;
+    const isTodayComplete = totalExpectedToday > 0 && completedToday === totalExpectedToday;
+
+    // Calcular racha contando hacia atrás desde hoy
+    let streakCount = 0;
+    let checkDate = new Date(today);
+    
+    // Si hoy está completo, contamos hoy
+    if (isTodayComplete) {
+        streakCount = 1;
+        checkDate.setDate(checkDate.getDate() - 1);
+    }
+    
+    // Contar días consecutivos completados hacia atrás
+    while (true) {
+        const dateKey = checkDate.toISOString().split('T')[0];
+        const totalExpected = (channels.length || 0) * (userData.shortsPerChannel || 0);
+        const completed = userData.calendar?.[dateKey] ? 
+            Object.values(userData.calendar[dateKey]).flat().filter(s => s === 'done').length : 0;
+        
+        if (totalExpected > 0 && completed === totalExpected) {
+            streakCount++;
+            checkDate.setDate(checkDate.getDate() - 1);
         } else {
-             currentStreakDisplay.innerText = `${userData.streak} días`;
+            break;
         }
-    } else if (diffDays === 1) { // Ayer fue el último login, posible continuación de racha
-        const yesterday = new Date(today);
-        yesterday.setDate(today.getDate() - 1);
-        const yesterdayDateKey = yesterday.toISOString().split('T')[0];
-
-        const totalExpectedYesterday = (channels.length || 0) * (userData.shortsPerChannel || 0);
-        const completedYesterday = userData.calendar?.[yesterdayDateKey] ? Object.values(userData.calendar[yesterdayDateKey]).flat().filter(s => s === 'done').length : 0;
-
-        if (totalExpectedYesterday > 0 && completedYesterday === totalExpectedYesterday) {
-            // La racha continúa, actualizamos la fecha de login
-            if (completedToday === totalExpectedToday && totalExpectedToday > 0) {
-                 userData.streak = (userData.streak || 0) + 1; // Si hoy también está completo, incrementa la racha
-                 currentStreakDisplay.innerText = `${userData.streak} días`;
-                 await saveData();
-            } else {
-                currentStreakDisplay.innerText = `${userData.streak} días`; // Todavía no completo hoy, muestra racha actual
-            }
-        } else {
-            // Ayer no se completó, la racha se rompe
-            userData.streak = 0;
-            currentStreakDisplay.innerText = '0 días';
-            await saveData();
-        }
-    } else { // Más de un día de diferencia, la racha se rompe
-        userData.streak = 0;
-        currentStreakDisplay.innerText = '0 días';
-        await saveData();
+        
+        // Límite de seguridad para evitar bucles infinitos
+        if (streakCount > 365) break;
     }
 
-    // Comprobar si se completó hoy por primera vez para incrementar la racha
-    if (completedToday === totalExpectedToday && totalExpectedToday > 0 && userData.lastLoginDate !== todayDateKey) {
-        userData.streak = (userData.streak || 0) + 1;
-        userData.lastLoginDate = todayDateKey; // Actualiza la fecha para evitar doble conteo
-        await saveData();
-    }
-     currentStreakDisplay.innerText = `${userData.streak || 0} días`; // Asegurarse de mostrar el valor final
+    // Actualizar la racha en userData
+    userData.streak = streakCount;
+    userData.lastLoginDate = todayDateKey;
+    await saveData();
 
-
-    checkAchievements(); // Comprobar logros después de actualizar la racha
+    // Mostrar la racha
+    currentStreakDisplay.innerText = `${streakCount} día${streakCount !== 1 ? 's' : ''}`;
 }
+
 
 // --- FUNCIONES DE LOGROS (GAMIFICACIÓN) ---
 const achievementDefinitions = {
-    'first_short': { title: 'Primer Short', description: '¡Publica tu primer short!', check: (data) => {
-        let totalCompleted = 0;
-        for (const dateKey in data.calendar) {
-            for (const channelName in data.calendar[dateKey]) {
-                totalCompleted += Object.values(data.calendar[dateKey][channelName]).filter(s => s === 'done').length;
+    'first_short': { 
+        title: 'Primer Short', 
+        description: '¡Publica tu primer short!', 
+        check: (data) => {
+            let totalCompleted = 0;
+            for (const dateKey in data.calendar) {
+                for (const channelName in data.calendar[dateKey]) {
+                    totalCompleted += Object.values(data.calendar[dateKey][channelName]).filter(s => s === 'done').length;
+                }
             }
+            return totalCompleted >= 1;
         }
-        return totalCompleted >= 1;
-    }},
-    'five_shorts': { title: 'Cinco Shorts', description: '¡Publica cinco shorts!', check: (data) => {
-        let totalCompleted = 0;
-        for (const dateKey in data.calendar) {
-            for (const channelName in data.calendar[dateKey]) {
-                totalCompleted += Object.values(data.calendar[dateKey][channelName]).filter(s => s === 'done').length;
+    },
+    'five_shorts': { 
+        title: 'Cinco Shorts', 
+        description: '¡Publica cinco shorts!', 
+        check: (data) => {
+            let totalCompleted = 0;
+            for (const dateKey in data.calendar) {
+                for (const channelName in data.calendar[dateKey]) {
+                    totalCompleted += Object.values(data.calendar[dateKey][channelName]).filter(s => s === 'done').length;
+                }
             }
+            return totalCompleted >= 5;
         }
-        return totalCompleted >= 5;
-    }},
-    'ten_shorts': { title: 'Diez Shorts', description: '¡Publica diez shorts!', check: (data) => {
-        let totalCompleted = 0;
-        for (const dateKey in data.calendar) {
-            for (const channelName in data.calendar[dateKey]) {
-                totalCompleted += Object.values(data.calendar[dateKey][channelName]).filter(s => s === 'done').length;
+    },
+    'ten_shorts': { 
+        title: 'Diez Shorts', 
+        description: '¡Publica diez shorts!', 
+        check: (data) => {
+            let totalCompleted = 0;
+            for (const dateKey in data.calendar) {
+                for (const channelName in data.calendar[dateKey]) {
+                    totalCompleted += Object.values(data.calendar[dateKey][channelName]).filter(s => s === 'done').length;
+                }
             }
+            return totalCompleted >= 10;
         }
-        return totalCompleted >= 10;
-    }},
-    'first_streak': { title: 'Primer Racha', description: '¡Mantén una racha de 3 días!', check: (data) => data.streak >= 3 },
-    'seven_streak': { title: 'Racha de la Semana', description: '¡Mantén una racha de 7 días!', check: (data) => data.streak >= 7 },
-    'new_channel': { title: 'Nuevo Canal', description: '¡Añade tu segundo canal!', check: (data) => data.channels.length >= 2 },
-    // Puedes añadir más logros aquí
+    },
+    'first_streak': { 
+        title: 'Primer Racha', 
+        description: '¡Mantén una racha de 3 días!', 
+        check: (data) => data.streak >= 3 
+    },
+    'seven_streak': { 
+        title: 'Racha de la Semana', 
+        description: '¡Mantén una racha de 7 días!', 
+        check: (data) => data.streak >= 7 
+    },
+    'thirty_streak': { 
+        title: 'Racha Legendaria', 
+        description: '¡Mantén una racha de 30 días!', 
+        check: (data) => data.streak >= 30 
+    },
+    'new_channel': { 
+        title: 'Nuevo Canal', 
+        description: '¡Añade tu segundo canal!', 
+        check: (data) => data.channels.length >= 2 
+    },
+    'three_channels': { 
+        title: 'Creador Múltiple', 
+        description: '¡Gestiona 3 canales!', 
+        check: (data) => data.channels.length >= 3 
+    }
 };
 
 async function checkAchievements() {
     if (!currentUser || !userData) return;
+
+    if (!userData.achievements) {
+        userData.achievements = [];
+    }
 
     let achievementsUpdated = false;
     for (const id in achievementDefinitions) {
@@ -501,14 +540,38 @@ async function checkAchievements() {
             userData.achievements.push(id);
             achievementsUpdated = true;
             console.log(`¡Logro desbloqueado: ${achievement.title}!`);
-            // alert(`¡Logro desbloqueado: ${achievement.title}!`); // Opcional: mostrar un alert
+            // Opcional: mostrar una notificación visual
+            showAchievementNotification(achievement.title);
         }
     }
 
     if (achievementsUpdated) {
         await saveData();
-        renderAchievements(); // Actualizar la vista de logros si se abre el modal
     }
+}
+
+function showAchievementNotification(title) {
+    // Crear notificación temporal (opcional)
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 15px 20px;
+        border-radius: 10px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        z-index: 10000;
+        animation: slideIn 0.5s ease;
+    `;
+    notification.innerHTML = `<strong>🏆 ¡Logro desbloqueado!</strong><br>${title}`;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.style.animation = 'slideOut 0.5s ease';
+        setTimeout(() => notification.remove(), 500);
+    }, 3000);
 }
 
 function renderAchievements() {
@@ -529,8 +592,11 @@ function renderAchievements() {
                 const li = document.createElement('li');
                 li.classList.add('achievement-item');
                 li.innerHTML = `
-                    <span class="achievement-title">🏆 ${achievement.title}</span>
-                    <span class="achievement-description">${achievement.description}</span>
+                    <span class="achievement-icon">🏆</span>
+                    <div class="achievement-info">
+                        <span class="achievement-title">${achievement.title}</span>
+                        <span class="achievement-description">${achievement.description}</span>
+                    </div>
                 `;
                 ul.appendChild(li);
             }
@@ -544,35 +610,57 @@ function renderAchievements() {
 
 // --- INICIALIZACIÓN Y EVENT LISTENERS ---
 function init() {
-    auth.onAuthStateChanged(handleAuthStatus); // Manejar cambios en el estado de autenticación
+    // Manejar cambios en el estado de autenticación
+    auth.onAuthStateChanged(handleAuthStatus);
 
+    // Event listener para añadir canal
     addChannelForm.addEventListener('submit', (e) => {
         e.preventDefault();
-        addChannel(newChannelNameInput.value.trim());
-        newChannelNameInput.value = '';
+        const channelName = newChannelNameInput.value.trim();
+        if (channelName) {
+            addChannel(channelName);
+            newChannelNameInput.value = '';
+        }
     });
     
+    // Event listeners para cambio de shorts por canal
     shortsPerChannelInput.addEventListener('change', updateShortsPerChannel);
     shortsPerChannelInput.addEventListener('input', updateShortsPerChannel);
 
-    settingsButton.addEventListener('click', () => setupModal.classList.remove('hide'));
+    // Event listeners para modales
+    settingsButton.addEventListener('click', () => {
+        setupModal.classList.remove('hide');
+        renderChannels(); // Actualizar lista de canales al abrir
+    });
     closeSetupButton.addEventListener('click', () => setupModal.classList.add('hide'));
     closeChecklistButton.addEventListener('click', () => checklistModal.classList.add('hide'));
-    document.getElementById('backButton').addEventListener('click', () => { nav--; renderCalendar(); });
-    document.getElementById('nextButton').addEventListener('click', () => { nav++; renderCalendar(); });
+    
+    // Navegación del calendario
+    document.getElementById('backButton').addEventListener('click', () => { 
+        nav--; 
+        renderCalendar(); 
+    });
+    document.getElementById('nextButton').addEventListener('click', () => { 
+        nav++; 
+        renderCalendar(); 
+    });
 
+    // Autenticación
     googleSignInButton.addEventListener('click', signInWithGoogle);
     signOutButton.addEventListener('click', signOutGoogle);
 
+    // Logros
     achievementsButton.addEventListener('click', () => {
         renderAchievements();
         achievementsModal.classList.remove('hide');
     });
     closeAchievementsButton.addEventListener('click', () => achievementsModal.classList.add('hide'));
 
-    renderCalendar(); // Renderizar el calendario al inicio
+    // Renderizar el calendario al inicio (vacío si no hay usuario)
+    renderCalendar();
 }
 
+// Inicializar la aplicación cuando el DOM esté listo
 init();
 
 // --- FIN DEL ARCHIVO script.js ---
