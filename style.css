@@ -11,6 +11,8 @@
     --complete-color: #2ecc71; /* Verde */
     --in-progress-color: #f39c12; /* Naranja */
     --error-color: #e74c3c; /* Rojo */
+    --secondary-bg-color: rgba(255, 255, 255, 0.2);
+    --shadow-small: 0 4px 6px rgba(0,0,0,0.05);
 }
 
 /* Variables para Modo Oscuro */
@@ -27,6 +29,8 @@
         --complete-color: #27ae60;
         --in-progress-color: #e67e22;
         --error-color: #c0392b;
+        --secondary-bg-color: rgba(0, 0, 0, 0.2);
+        --shadow-small: 0 4px 6px rgba(0,0,0,0.15);
     }
 }
 
@@ -41,12 +45,12 @@ body {
     background-color: var(--bg-color-primary);
     color: var(--text-color-primary);
     transition: background-color 0.3s ease, color 0.3s ease;
-    overflow-x: hidden; /* Evita scroll horizontal */
+    overflow-x: hidden;
 }
 
 #app-wrapper {
     width: 100%;
-    max-width: 500px; /* Ancho máximo para el móvil */
+    max-width: 500px;
     padding: 20px;
     box-sizing: border-box;
 }
@@ -130,7 +134,7 @@ body {
     align-items: center;
     font-size: 0.9em;
     cursor: pointer;
-    border-radius: 50%; /* Más redondo */
+    border-radius: 50%;
     transition: background-color 0.2s, transform 0.2s;
     position: relative;
     overflow: hidden;
@@ -149,7 +153,7 @@ body {
 .day .day-number {
     font-weight: 600;
     position: relative;
-    z-index: 1; /* Para que el número esté encima del progreso */
+    z-index: 1;
 }
 
 .day.current-day {
@@ -160,23 +164,21 @@ body {
     color: var(--accent-color);
 }
 
-
-/* Progress Indicator (new animated fill) */
+/* Progress Indicator (animated fill) */
 .day .progress-circle {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: var(--in-progress-color); /* Color por defecto */
     border-radius: 50%;
-    transform: scaleY(0); /* Empieza vacío */
+    transform: scaleY(0);
     transform-origin: bottom;
-    transition: transform 0.3s ease;
-    z-index: 0; /* Detrás del número */
+    transition: transform 0.3s ease, background-color 0.3s ease;
+    z-index: 0;
 }
 
-.day.progress-0 .progress-circle { transform: scaleY(0); background-color: transparent; }
+.day.progress-0 .progress-circle { transform: scaleY(0); }
 .day.progress-1 .progress-circle { transform: scaleY(0.125); }
 .day.progress-2 .progress-circle { transform: scaleY(0.25); }
 .day.progress-3 .progress-circle { transform: scaleY(0.375); }
@@ -184,12 +186,7 @@ body {
 .day.progress-5 .progress-circle { transform: scaleY(0.625); }
 .day.progress-6 .progress-circle { transform: scaleY(0.75); }
 .day.progress-7 .progress-circle { transform: scaleY(0.875); }
-.day.progress-8 .progress-circle { 
-    transform: scaleY(1); 
-    background-color: var(--complete-color); /* Verde cuando está completo */
-}
-.day.progress-0 .progress-circle { background-color: transparent; } /* Asegura que no haya color si no hay progreso */
-
+.day.progress-8 .progress-circle { transform: scaleY(1); }
 
 /* Progress Bars */
 .progress-bar-container {
@@ -223,11 +220,10 @@ body {
     font-size: 0.75em;
 }
 
-
 .progress-bar-fill {
     height: 100%;
     background: linear-gradient(90deg, var(--accent-color), var(--complete-color));
-    width: 0%; /* Controlado por JS */
+    width: 0%;
     border-radius: 10px;
     transition: width 0.5s ease-out;
 }
@@ -239,7 +235,7 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0,0,0,0.4); /* Sutil oscurecimiento */
+    background-color: rgba(0,0,0,0.4);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -280,43 +276,17 @@ body {
     margin-bottom: 25px;
 }
 
-/* Form inputs */
-#setupForm {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-}
-#setupForm input {
-    padding: 12px 15px;
-    border: 1px solid var(--border-color);
-    border-radius: 10px;
-    font-size: 1em;
-    background-color: rgba(255, 255, 255, 0.1);
-    color: var(--text-color-primary);
-    transition: border-color 0.2s, background-color 0.2s;
-}
-#setupForm input::placeholder {
-    color: var(--text-color-secondary);
-    opacity: 0.7;
-}
-#setupForm input:focus {
-    outline: none;
-    border-color: var(--accent-color);
-    background-color: rgba(255, 255, 255, 0.2);
-    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.3);
-}
-
 /* Action Buttons */
 .action-button {
     background-color: var(--accent-color);
-    color: var(--text-color-primary); /* Texto oscuro para contraste */
+    color: var(--text-color-primary);
     border: none;
     padding: 12px 20px;
     border-radius: 10px;
     cursor: pointer;
     font-size: 1em;
     font-weight: 600;
-    margin-top: 25px;
+    margin-top: 10px; /* Reducido para auth buttons */
     transition: background-color 0.2s, transform 0.2s;
     box-shadow: 0 4px 10px var(--shadow-color);
     width: 100%;
@@ -333,74 +303,13 @@ body {
 }
 .action-button#closeChecklistButton {
     background-color: var(--error-color);
-    color: var(--text-color-primary);
+    color: white;
 }
 .action-button#closeChecklistButton:hover {
     background-color: #c0392b;
 }
 
-/* Checklist specific styles */
-#checklist-container {
-    margin-top: 20px;
-    max-height: 250px; /* Para que sea scrollable si hay muchos */
-    overflow-y: auto;
-    padding-right: 10px; /* Para el scrollbar */
-}
-.channel-group {
-    background-color: rgba(0,0,0,0.05);
-    border-radius: 10px;
-    padding: 15px;
-    margin-bottom: 15px;
-    border: 1px solid var(--border-color);
-}
-.channel-group h4 {
-    margin: 0 0 12px 0;
-    color: var(--text-color-primary);
-    font-size: 1.1em;
-    font-weight: 600;
-    border-bottom: 1px solid var(--border-color);
-    padding-bottom: 8px;
-}
-.checklist-item {
-    display: flex;
-    align-items: center;
-    margin-bottom: 10px;
-    font-size: 0.95em;
-}
-.checklist-item input[type="checkbox"] {
-    appearance: none;
-    -webkit-appearance: none;
-    width: 20px;
-    height: 20px;
-    border: 2px solid var(--text-color-secondary);
-    border-radius: 5px;
-    margin-right: 12px;
-    cursor: pointer;
-    position: relative;
-    transition: background-color 0.2s, border-color 0.2s;
-}
-.checklist-item input[type="checkbox"]:checked {
-    background-color: var(--complete-color);
-    border-color: var(--complete-color);
-}
-.checklist-item input[type="checkbox"]:checked::after {
-    content: '✓';
-    color: var(--text-color-primary);
-    font-size: 1.2em;
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-}
-.checklist-item label {
-    cursor: pointer;
-    color: var(--text-color-primary);
-}
-
-
-/* --- ESTILOS ADICIONALES PARA LA VERSIÓN DINÁMICA --- */
-
-/* Botón de configuración de canales */
+/* ESTILOS PARA CONFIGURACIÓN */
 .settings-btn {
     background-color: transparent;
     border: 1px solid var(--border-color);
@@ -410,7 +319,7 @@ body {
     cursor: pointer;
     font-size: 0.9em;
     font-weight: 500;
-    margin: 15px auto 0;
+    margin: 0 auto;
     display: block;
     transition: background-color 0.2s, color 0.2s;
 }
@@ -420,28 +329,33 @@ body {
     border-color: var(--accent-color);
 }
 
-/* Formulario para añadir canal */
-.form-group {
-    display: flex;
-    gap: 10px;
+.config-section {
+    background-color: rgba(0,0,0,0.05);
+    border-radius: 10px;
+    padding: 15px;
     margin-bottom: 20px;
+    border: 1px solid var(--border-color);
 }
-.form-group input {
-    flex-grow: 1;
+.config-section p, .config-section label {
+    margin: 0 0 10px 0;
+    font-weight: 500;
+    color: var(--text-color-secondary);
+}
+.config-section input[type="number"], .config-section input[type="text"] {
+    width: 100%;
     padding: 12px 15px;
     border: 1px solid var(--border-color);
     border-radius: 10px;
     font-size: 1em;
     background-color: rgba(255, 255, 255, 0.1);
     color: var(--text-color-primary);
-}
-.form-group input:focus {
-    outline: none;
-    border-color: var(--accent-color);
-    background-color: rgba(255, 255, 255, 0.2);
-    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.3);
+    box-sizing: border-box;
 }
 
+.form-group {
+    display: flex;
+    gap: 10px;
+}
 .add-btn {
     flex-shrink: 0;
     width: 45px;
@@ -460,11 +374,10 @@ body {
     transform: scale(1.1);
 }
 
-/* Lista de canales */
 #channelList {
     list-style: none;
     padding: 0;
-    margin: 0 0 20px 0;
+    margin: 20px 0 0 0;
     max-height: 150px;
     overflow-y: auto;
 }
@@ -480,7 +393,7 @@ body {
 }
 .delete-channel-btn {
     background-color: var(--error-color);
-    color: var(--text-color-primary);
+    color: white;
     border: none;
     border-radius: 50%;
     width: 25px;
@@ -494,67 +407,145 @@ body {
     background-color: #c0392b;
 }
 
-/* Configuración general */
-.config-section {
-    background-color: rgba(0,0,0,0.05);
-    border-radius: 10px;
-    padding: 15px;
-    margin-bottom: 20px;
-    border: 1px solid var(--border-color);
-}
-.config-section p {
-    margin: 0 0 10px 0;
-    font-weight: 500;
-    color: var(--text-color-secondary);
-}
-.config-section label {
-    display: block;
-    margin-bottom: 10px;
-    font-weight: 500;
-    color: var(--text-color-secondary);
-}
-.config-section input[type="number"] {
-    width: 100%;
-    padding: 12px 15px;
-    border: 1px solid var(--border-color);
-    border-radius: 10px;
-    font-size: 1em;
-    background-color: rgba(255, 255, 255, 0.1);
-    color: var(--text-color-primary);
-    box-sizing: border-box;
-}
-/* --- ESTILOS PARA AUTENTICACIÓN --- */
+/* ESTILOS PARA AUTENTICACIÓN */
 #authContainer {
     text-align: center;
-    margin-top: 20px;
+    margin-top: 10px;
     padding-top: 20px;
     border-top: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
     gap: 10px;
 }
-
 .user-status {
     font-size: 0.9em;
     color: var(--text-color-secondary);
     margin-bottom: 5px;
 }
-
-#googleSignInButton,
-#signOutButton {
+#googleSignInButton, #signOutButton {
     padding: 10px 15px;
     font-size: 0.9em;
-    background-color: #4285F4; /* Color de Google */
+    background-color: #4285F4;
     color: white;
     border-radius: 8px;
+    margin-top: 0;
 }
-
-#googleSignInButton:hover,
-#signOutButton:hover {
+#googleSignInButton:hover, #signOutButton:hover {
     background-color: #357ae8;
 }
 
-/* Clase de utilidad para ocultar/mostrar elementos */
+/* ESTILOS PARA ESTADOS DE VIDEO */
+#checklist-container {
+    margin-top: 20px;
+    max-height: 250px;
+    overflow-y: auto;
+    padding-right: 10px;
+}
+.channel-group {
+    background-color: rgba(0,0,0,0.05);
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 15px;
+    border: 1px solid var(--border-color);
+}
+.channel-group h4 {
+    margin: 0 0 12px 0;
+    color: var(--text-color-primary);
+    font-size: 1.1em;
+    font-weight: 600;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 8px;
+}
+.checklist-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    font-size: 0.95em;
+    padding: 8px 0;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.1);
+}
+.checklist-item:last-child {
+    border-bottom: none;
+}
+.item-label {
+    flex-grow: 1;
+    color: var(--text-color-primary);
+    font-weight: 500;
+}
+.status-buttons {
+    display: flex;
+    gap: 5px;
+}
+.status-button {
+    background-color: var(--text-color-secondary);
+    color: var(--text-color-primary);
+    border: none;
+    padding: 6px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.8em;
+    font-weight: 600;
+    transition: background-color 0.2s, transform 0.1s;
+    white-space: nowrap;
+}
+.status-button:hover {
+    transform: translateY(-1px);
+}
+.status-button.status-Pendiente {
+    background-color: #95a5a6;
+    color: white;
+}
+.status-button.status-Creado {
+    background-color: var(--in-progress-color);
+    color: white;
+}
+.status-button.status-Publicado {
+    background-color: var(--complete-color);
+    color: white;
+}
+.status-button.active-status {
+    box-shadow: 0 0 0 3px var(--accent-color), inset 0 0 5px rgba(0,0,0,0.2);
+    transform: translateY(-1px);
+}
+.day .progress-circle.progress-Publicado {
+    background-color: var(--complete-color);
+}
+.day .progress-circle.progress-Creado {
+    background-color: var(--in-progress-color);
+}
+.day .progress-circle.progress-Pendiente {
+    background-color: #95a5a6;
+}
+.day .progress-circle.progress-none {
+    background-color: transparent;
+}
+
+/* ESTILOS PARA EL CONTADOR DE RACHAS */
+.streak-container {
+    text-align: center;
+    margin-top: 10px;
+    padding: 10px;
+    background-color: var(--secondary-bg-color);
+    border-radius: 12px;
+    box-shadow: var(--shadow-small);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+}
+.streak-label {
+    font-size: 1.1em;
+    font-weight: 600;
+    color: var(--accent-color);
+}
+.streak-value {
+    font-size: 1.3em;
+    font-weight: 700;
+    color: var(--text-color-primary);
+}
+
+/* Clase de utilidad */
 .hide {
     display: none !important;
 }
