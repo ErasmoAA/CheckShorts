@@ -92,14 +92,6 @@ function getOrphanChannelNames() {
   return [...inCalendar].filter(name => !inChannels.has(name));
 }
 
-/**
- * Migra y repara userData:
- * - Normaliza channels (strings -> {id, name})
- * - Añade canales detectados desde el calendario (huérfanos)
- * - Elimina la llave 'undefined' del calendario
- * - Convierte estados viejos: 'fail' -> 'pending'
- * - Guarda si hubo cambios
- */
 async function migrateAndRepairUserData() {
   if (!userData) return;
 
@@ -109,33 +101,33 @@ async function migrateAndRepairUserData() {
   const normalized = [];
   const seen = new Set();
 
-  // Esta parte de normalización de la lista de canales está bien.
+  // 1. Normaliza la lista de canales principal
   for (const item of original) {
     if (typeof item === 'string') {
-      const name = item.trim();
-      if (name && name.toLowerCase() !== 'undefined') {
-        const key = name.toLowerCase();
-        if (!seen.has(key)) {
-          normalized.push({ id: genId(), name });
-          seen.add(key);
-          changed = true;
+        const name = item.trim();
+        if (name && name.toLowerCase() !== 'undefined') {
+            const key = name.toLowerCase();
+            if (!seen.has(key)) {
+                normalized.push({ id: genId(), name });
+                seen.add(key);
+                changed = true;
+            }
         }
-      }
     } else if (item && typeof item === 'object') {
-      const name = (item.name ?? item.channel ?? '').toString().trim();
-      if (name && name.toLowerCase() !== 'undefined') {
-        const key = name.toLowerCase();
-        if (!seen.has(key)) {
-          normalized.push({ id: item.id || genId(), name });
-          seen.add(key);
+        const name = (item.name ?? item.channel ?? '').toString().trim();
+        if (name && name.toLowerCase() !== 'undefined') {
+            const key = name.toLowerCase();
+            if (!seen.has(key)) {
+                normalized.push({ id: item.id || genId(), name });
+                seen.add(key);
+            }
+        } else {
+            changed = true;
         }
-      } else {
-        changed = true;
-      }
     }
   }
 
-  // VERSIÓN SEGURA: Esta sección ya NO re-añade canales desde el calendario.
+  // 2. Limpia el calendario de datos inválidos (SIN AÑADIR CANALES)
   if (userData.calendar && typeof userData.calendar === 'object') {
     for (const dateKey of Object.keys(userData.calendar)) {
       const day = userData.calendar[dateKey];
@@ -165,6 +157,7 @@ async function migrateAndRepairUserData() {
     }
   }
   
+  // 3. Guarda los cambios si hubo alguna normalización o limpieza
   if (changed || normalized.length !== original.length) {
     userData.channels = normalized;
     channels = normalized;
@@ -180,8 +173,10 @@ async function migrateAndRepairUserData() {
  */
 async function purgeOrphanChannelsFromCalendar() {
   if (!userData?.calendar) return;
+
   const keepNames = new Set((channels || []).map(c => c.name));
   let changed = false;
+  const deletedOrphans = []; // Array para guardar los nombres de los huérfanos eliminados
 
   for (const dateKey of Object.keys(userData.calendar)) {
     const day = userData.calendar[dateKey];
@@ -193,6 +188,7 @@ async function purgeOrphanChannelsFromCalendar() {
     }
     for (const key of Object.keys(day)) {
       if (!keepNames.has(key)) {
+        deletedOrphans.push(key); // Añadimos el nombre a la lista
         delete day[key];
         changed = true;
       }
@@ -200,9 +196,19 @@ async function purgeOrphanChannelsFromCalendar() {
   }
 
   if (changed) {
-    await saveData();
+    await saveData(); // Guardamos el objeto userData ya limpio
     renderCalendar();
     updateSettingsExtras();
+    
+    // Mostramos un alert más informativo
+    const uniqueDeleted = [...new Set(deletedOrphans)]; // Nos aseguramos de no repetir nombres
+    if (uniqueDeleted.length > 0) {
+      alert(`Limpieza completada.\nCanales eliminados del calendario: ${uniqueDeleted.join(', ')}`);
+    } else {
+      alert('Limpieza completada. No se encontraron nuevos datos para eliminar.');
+    }
+  } else {
+    alert('No se encontraron canales huérfanos para eliminar.');
   }
 }
 
