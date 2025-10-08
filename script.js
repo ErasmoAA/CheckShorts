@@ -529,10 +529,13 @@ function renderChannels() {
     channels.sort((a, b) => a.name.localeCompare(b.name));
     channels.forEach(channel => {
       const li = document.createElement('li');
+      
+      // CORRECCIÓN: Se elimina el comentario que se mostraba como texto.
       li.innerHTML = `
         <span>${channel.name}</span>
         <button class="remove-btn" title="Eliminar canal">-</button>
       `;
+      
       li.querySelector('.remove-btn').addEventListener('click', () => removeChannel(channel.name));
       channelList.appendChild(li);
     });
@@ -857,4 +860,3 @@ function init() {
 
 init();
 // --- FIN ---
-
