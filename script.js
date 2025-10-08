@@ -531,7 +531,6 @@ function renderChannels() {
       const li = document.createElement('li');
       li.innerHTML = `
         <span>${channel.name}</span>
-        {/* MEJORA: Título del botón más descriptivo */}
         <button class="remove-btn" title="Eliminar canal">-</button>
       `;
       li.querySelector('.remove-btn').addEventListener('click', () => removeChannel(channel.name));
@@ -858,3 +857,4 @@ function init() {
 
 init();
 // --- FIN ---
+
