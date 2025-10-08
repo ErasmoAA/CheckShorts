@@ -343,6 +343,9 @@ async function saveData() {
     userData.channels = channels;
     userData.shortsPerChannel = parseInt(shortsPerChannelInput.value);
     await docRef.set(userData, { merge: true });
+
+    // MEJORA: Mensaje de confirmación en la consola.
+    console.log("✅ Datos guardados correctamente");
   } catch (error) {
     console.error("Error al guardar datos:", error);
   }
@@ -478,19 +481,42 @@ async function addChannel(name) {
 
 async function removeChannel(name) {
   if (!currentUser) return;
+
+  // MEJORA: Confirmación antes de eliminar para evitar accidentes.
+  if (!confirm(`¿Estás seguro de que quieres eliminar el canal "${name}"? Esta acción es permanente y borrará todos sus datos.`)) {
+    return;
+  }
+
+  // SOLUCIÓN ROBUSTA:
+  // 1. Actualiza la lista local de canales, que es la fuente de verdad.
   channels = channels.filter(c => c.name !== name);
 
+  // 2. Limpia el calendario de forma exhaustiva, eliminando cualquier dato
+  // de canales que ya no estén en la lista principal.
+  const keepNames = new Set(channels.map(c => c.name));
   if (userData.calendar) {
-    for (const date in userData.calendar) {
-      if (userData.calendar[date][name]) {
-        delete userData.calendar[date][name];
+    for (const dateKey of Object.keys(userData.calendar)) {
+      const dayData = userData.calendar[dateKey];
+      if (!dayData || typeof dayData !== 'object') continue;
+
+      for (const channelNameInCalendar of Object.keys(dayData)) {
+        if (!keepNames.has(channelNameInCalendar)) {
+          delete dayData[channelNameInCalendar];
+        }
       }
     }
   }
+
+  // 3. Guarda los datos completamente limpios en Firestore.
   await saveData();
+
+  // 4. Actualiza la interfaz de usuario.
   renderChannels();
   renderCalendar();
   updateSettingsExtras();
+
+  // MEJORA: Mensaje de confirmación en la consola para depuración.
+  console.log(`✅ Canal "${name}" eliminado permanentemente.`);
 }
 
 function renderChannels() {
@@ -505,7 +531,8 @@ function renderChannels() {
       const li = document.createElement('li');
       li.innerHTML = `
         <span>${channel.name}</span>
-        <button class="remove-btn" title="Eliminar">-</button>
+        {/* MEJORA: Título del botón más descriptivo */}
+        <button class="remove-btn" title="Eliminar canal">-</button>
       `;
       li.querySelector('.remove-btn').addEventListener('click', () => removeChannel(channel.name));
       channelList.appendChild(li);
