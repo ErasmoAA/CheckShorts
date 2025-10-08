@@ -105,27 +105,25 @@ async function migrateAndRepairUserData() {
 
   let changed = false;
 
-  // 1) Normalizar channels
   const original = Array.isArray(userData.channels) ? userData.channels : [];
   const normalized = [];
   const seen = new Set();
 
-  const pushIfNew = (rawName) => {
-    const name = (rawName ?? '').toString().trim();
-    if (!name || name.toLowerCase() === 'undefined') return;
-    const key = name.toLowerCase();
-    if (seen.has(key)) return;
-    normalized.push({ id: genId(), name });
-    seen.add(key);
-  };
-
+  // Esta parte de normalización de la lista de canales está bien.
   for (const item of original) {
     if (typeof item === 'string') {
-      pushIfNew(item);
-      changed = true;
+      const name = item.trim();
+      if (name && name.toLowerCase() !== 'undefined') {
+        const key = name.toLowerCase();
+        if (!seen.has(key)) {
+          normalized.push({ id: genId(), name });
+          seen.add(key);
+          changed = true;
+        }
+      }
     } else if (item && typeof item === 'object') {
       const name = (item.name ?? item.channel ?? '').toString().trim();
-      if (name) {
+      if (name && name.toLowerCase() !== 'undefined') {
         const key = name.toLowerCase();
         if (!seen.has(key)) {
           normalized.push({ id: item.id || genId(), name });
@@ -137,31 +135,26 @@ async function migrateAndRepairUserData() {
     }
   }
 
-  // 2) Limpiar calendario, migrar estados y recolectar huérfanos
+  // VERSIÓN SEGURA: Esta sección ya NO re-añade canales desde el calendario.
   if (userData.calendar && typeof userData.calendar === 'object') {
     for (const dateKey of Object.keys(userData.calendar)) {
       const day = userData.calendar[dateKey];
       if (!day || typeof day !== 'object') continue;
 
-      // borrar explícitamente la llave 'undefined'
       if (Object.prototype.hasOwnProperty.call(day, 'undefined')) {
         delete day['undefined'];
         changed = true;
       }
 
       for (const channelName of Object.keys(day)) {
-        pushIfNew(channelName);
-
         const items = day[channelName];
         if (items && typeof items === 'object') {
           for (const sId of Object.keys(items)) {
             const s = items[sId];
-            // migración de estados
-            if (s === 'fail') {           // viejo "no realizado" -> ahora "no hecho"
+            if (s === 'fail') {
               items[sId] = 'pending';
               changed = true;
             }
-            // normalizar variantes raras
             if (s === 'inprogress') {
               items[sId] = 'in_progress';
               changed = true;
@@ -171,8 +164,7 @@ async function migrateAndRepairUserData() {
       }
     }
   }
-
-  // 3) Persistir si cambió algo
+  
   if (changed || normalized.length !== original.length) {
     userData.channels = normalized;
     channels = normalized;
@@ -482,17 +474,14 @@ async function addChannel(name) {
 async function removeChannel(name) {
   if (!currentUser) return;
 
-  // MEJORA: Confirmación antes de eliminar para evitar accidentes.
   if (!confirm(`¿Estás seguro de que quieres eliminar el canal "${name}"? Esta acción es permanente y borrará todos sus datos.`)) {
     return;
   }
 
-  // SOLUCIÓN ROBUSTA:
-  // 1. Actualiza la lista local de canales, que es la fuente de verdad.
+  // Se asegura de eliminar el canal de la lista principal
   channels = channels.filter(c => c.name !== name);
 
-  // 2. Limpia el calendario de forma exhaustiva, eliminando cualquier dato
-  // de canales que ya no estén en la lista principal.
+  // Limpia el calendario de forma exhaustiva para no dejar datos huérfanos
   const keepNames = new Set(channels.map(c => c.name));
   if (userData.calendar) {
     for (const dateKey of Object.keys(userData.calendar)) {
@@ -507,15 +496,12 @@ async function removeChannel(name) {
     }
   }
 
-  // 3. Guarda los datos completamente limpios en Firestore.
   await saveData();
 
-  // 4. Actualiza la interfaz de usuario.
   renderChannels();
   renderCalendar();
   updateSettingsExtras();
 
-  // MEJORA: Mensaje de confirmación en la consola para depuración.
   console.log(`✅ Canal "${name}" eliminado permanentemente.`);
 }
 
