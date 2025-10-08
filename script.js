@@ -213,6 +213,67 @@ async function purgeOrphanChannelsFromCalendar() {
 }
 
 /**
+ * FUNCIÓN DE LIMPIEZA FORZADA
+ * Se ejecuta manualmente desde la consola para encontrar y destruir
+ * cualquier dato de canal huérfano de forma agresiva.
+ */
+async function forceCleanOrphans() {
+  console.log("--- INICIANDO LIMPIEZA FORZADA ---");
+
+  if (!currentUser || !userData) {
+    console.error("Error: Debes iniciar sesión para ejecutar la limpieza.");
+    return;
+  }
+
+  // 1. Obtener la lista definitiva de canales válidos
+  const validChannelNames = new Set(userData.channels.map(c => c.name));
+  console.log("Canales válidos según userData:", Array.from(validChannelNames));
+
+  // 2. Identificar los canales huérfanos REALES en el calendario
+  const orphans = new Set();
+  for (const dateKey in userData.calendar) {
+    const dayData = userData.calendar[dateKey];
+    for (const channelName in dayData) {
+      if (!validChannelNames.has(channelName)) {
+        orphans.add(channelName);
+      }
+    }
+  }
+
+  if (orphans.size === 0) {
+    console.log("✅ No se encontraron canales huérfanos en el calendario. La base de datos parece estar limpia.");
+    console.log("--- FIN DE LA LIMPIEZA ---");
+    return;
+  }
+
+  console.warn("Canales huérfanos encontrados:", Array.from(orphans));
+
+  // 3. Eliminar agresivamente los huérfanos del objeto userData en memoria
+  let changed = false;
+  for (const dateKey in userData.calendar) {
+    const dayData = userData.calendar[dateKey];
+    for (const orphanName of orphans) {
+      if (dayData[orphanName]) {
+        console.log(`Eliminando "${orphanName}" del calendario para la fecha: ${dateKey}`);
+        delete dayData[orphanName];
+        changed = true;
+      }
+    }
+  }
+
+  // 4. Guardar el estado limpio en Firestore
+  if (changed) {
+    console.log("Guardando el estado limpio en Firestore...");
+    await saveData();
+    console.log("¡Limpieza forzada completada! Recarga la página para verificar.");
+  } else {
+    console.log("No se realizaron cambios, no es necesario guardar.");
+  }
+
+  console.log("--- FIN DE LA LIMPIEZA ---");
+}
+
+/**
  * Inserta/actualiza UI adicional en el modal de Configuración:
  * - Contador de canales
  * - Contador de huérfanos detectados en calendario
