@@ -1,6 +1,7 @@
-// ===============================
-// scripts.js (CORREGIDO - sin auto-recuperación de canales)
-// ===============================
+// ======================================================
+// scripts.js - VERSIÓN FINAL Y CORREGIDA
+// Incluye todas las mejoras y soluciones de errores.
+// ======================================================
 
 // --- VARIABLES GLOBALES Y SELECTORES ---
 let nav = 0;
@@ -88,16 +89,15 @@ function getOrphanChannelNames() {
   return [...inCalendar].filter(name => !inChannels.has(name));
 }
 
+// --- FUNCIONES DE MANTENIMIENTO Y REPARACIÓN ---
+
 /**
- * Migra y repara userData - VERSIÓN CORREGIDA
- * YA NO re-añade canales automáticamente desde el calendario
+ * (SEGURO) Migra y repara userData sin revivir canales eliminados.
  */
 async function migrateAndRepairUserData() {
   if (!userData) return;
 
   let changed = false;
-
-  // 1) Normalizar channels (strings -> {id, name})
   const original = Array.isArray(userData.channels) ? userData.channels : [];
   const normalized = [];
   const seen = new Set();
@@ -127,14 +127,11 @@ async function migrateAndRepairUserData() {
     }
   }
 
-  // 2) Limpiar calendario y migrar estados
-  // ⚠️ CAMBIO IMPORTANTE: Ya NO añadimos canales automáticamente
   if (userData.calendar && typeof userData.calendar === 'object') {
     for (const dateKey of Object.keys(userData.calendar)) {
       const day = userData.calendar[dateKey];
       if (!day || typeof day !== 'object') continue;
 
-      // Eliminar la llave 'undefined'
       if (Object.prototype.hasOwnProperty.call(day, 'undefined')) {
         delete day['undefined'];
         changed = true;
@@ -145,7 +142,6 @@ async function migrateAndRepairUserData() {
         if (items && typeof items === 'object') {
           for (const sId of Object.keys(items)) {
             const s = items[sId];
-            // Migrar estados antiguos
             if (s === 'fail') {
               items[sId] = 'pending';
               changed = true;
@@ -160,7 +156,6 @@ async function migrateAndRepairUserData() {
     }
   }
 
-  // 3) Persistir si cambió algo
   if (changed || normalized.length !== original.length) {
     userData.channels = normalized;
     channels = normalized;
@@ -171,12 +166,14 @@ async function migrateAndRepairUserData() {
 }
 
 /**
- * Limpia canales huérfanos del calendario manualmente
+ * (ROBUSTO) Purga del calendario todas las entradas de canales que NO estén en `channels`.
  */
 async function purgeOrphanChannelsFromCalendar() {
   if (!userData?.calendar) return;
+
   const keepNames = new Set((channels || []).map(c => c.name));
   let changed = false;
+  const deletedOrphans = [];
 
   for (const dateKey of Object.keys(userData.calendar)) {
     const day = userData.calendar[dateKey];
@@ -188,6 +185,7 @@ async function purgeOrphanChannelsFromCalendar() {
     }
     for (const key of Object.keys(day)) {
       if (!keepNames.has(key)) {
+        deletedOrphans.push(key);
         delete day[key];
         changed = true;
       }
@@ -198,8 +196,74 @@ async function purgeOrphanChannelsFromCalendar() {
     await saveData();
     renderCalendar();
     updateSettingsExtras();
+
+    const uniqueDeleted = [...new Set(deletedOrphans)];
+    if (uniqueDeleted.length > 0) {
+      alert(`Limpieza completada.\nCanales eliminados del calendario: ${uniqueDeleted.join(', ')}`);
+    } else {
+      alert('Limpieza completada. No se encontraron nuevos datos para eliminar.');
+    }
+  } else {
+    alert('No se encontraron canales huérfanos para eliminar.');
   }
 }
+
+/**
+ * (HERRAMIENTA DE DEBUG) Limpieza forzada para ejecutar desde la consola.
+ */
+async function forceCleanOrphans() {
+  console.log("--- INICIANDO LIMPIEZA FORZADA ---");
+
+  if (!currentUser || !userData) {
+    console.error("Error: Debes iniciar sesión para ejecutar la limpieza.");
+    return;
+  }
+
+  const validChannelNames = new Set(userData.channels.map(c => c.name));
+  console.log("Canales válidos según userData:", Array.from(validChannelNames));
+
+  const orphans = new Set();
+  for (const dateKey in userData.calendar) {
+    const dayData = userData.calendar[dateKey];
+    for (const channelName in dayData) {
+      if (!validChannelNames.has(channelName)) {
+        orphans.add(channelName);
+      }
+    }
+  }
+
+  if (orphans.size === 0) {
+    console.log("✅ No se encontraron canales huérfanos en el calendario. La base de datos parece estar limpia.");
+    console.log("--- FIN DE LA LIMPIEZA ---");
+    return;
+  }
+
+  console.warn("Canales huérfanos encontrados:", Array.from(orphans));
+
+  let changed = false;
+  for (const dateKey in userData.calendar) {
+    const dayData = userData.calendar[dateKey];
+    for (const orphanName of orphans) {
+      if (dayData[orphanName]) {
+        console.log(`Eliminando "${orphanName}" del calendario para la fecha: ${dateKey}`);
+        delete dayData[orphanName];
+        changed = true;
+      }
+    }
+  }
+
+  if (changed) {
+    console.log("Guardando el estado limpio en Firestore...");
+    await saveData();
+    console.log("¡Limpieza forzada completada! Recarga la página para verificar.");
+  } else {
+    console.log("No se realizaron cambios, no es necesario guardar.");
+  }
+
+  console.log("--- FIN DE LA LIMPIEZA ---");
+}
+
+// --- GESTIÓN DE LA INTERFAZ DE CONFIGURACIÓN ---
 
 function ensureSettingsExtras() {
   const section = channelList?.closest('.config-section');
@@ -218,11 +282,10 @@ function ensureSettingsExtras() {
     cleanBtn = document.createElement('button');
     cleanBtn.id = 'cleanOrphansButton';
     cleanBtn.className = 'action-button close-button';
-    cleanBtn.textContent = 'Limpiar datos antiguos del calendario';
+    cleanBtn.textContent = 'Eliminar canales huérfanos del calendario';
     cleanBtn.style.marginTop = '8px';
     cleanBtn.addEventListener('click', async () => {
       await purgeOrphanChannelsFromCalendar();
-      alert('✅ Limpieza completada. Se eliminaron datos de canales antiguos.');
     });
     section.appendChild(cleanBtn);
   }
@@ -234,9 +297,13 @@ function updateSettingsExtras() {
   const stats = document.getElementById('channelStats');
   if (!stats) return;
   const orphanCount = getOrphanChannelNames().length;
-  stats.textContent = `Canales activos: ${channels.length}${orphanCount > 0 ? ` · Datos antiguos detectados: ${orphanCount}` : ''}`;
+  stats.textContent = `Canales: ${channels.length} · Huérfanos en calendario: ${orphanCount}`;
+  
+  const cleanBtn = document.getElementById('cleanOrphansButton');
+  if (cleanBtn) {
+      cleanBtn.style.display = orphanCount > 0 ? 'block' : 'none';
+  }
 }
-
 
 // --- AUTENTICACIÓN ---
 async function signInWithGoogle() {
@@ -347,16 +414,13 @@ function renderCalendar() {
 
   let totalVideosThisWeek = 0;
   let completedVideosThisWeek = 0;
-
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-
   const startOfWeek = new Date(today);
   const currentDayOfWeek = today.getDay();
   const daysFromMonday = (currentDayOfWeek + 6) % 7;
   startOfWeek.setDate(today.getDate() - daysFromMonday);
   startOfWeek.setHours(0, 0, 0, 0);
-
   const endOfWeek = new Date(startOfWeek);
   endOfWeek.setDate(startOfWeek.getDate() + 7);
 
@@ -389,7 +453,6 @@ function renderCalendar() {
 
     if (totalForDay > 0) {
       const progressPercentage = (completedForDay / totalForDay) * 100;
-
       const progressBar = document.createElement('div');
       progressBar.classList.add('day-progress-bar');
       progressBar.style.width = `${progressPercentage}%`;
@@ -452,29 +515,32 @@ async function addChannel(name) {
 
 async function removeChannel(name) {
   if (!currentUser) return;
-  
-  // Confirmar antes de eliminar
-  if (!confirm(`¿Eliminar el canal "${name}" y todos sus datos del calendario?`)) {
+
+  if (!confirm(`¿Estás seguro de que quieres eliminar el canal "${name}"? Esta acción es permanente y borrará todos sus datos.`)) {
     return;
   }
-  
+
   channels = channels.filter(c => c.name !== name);
 
-  // Limpiar TODO el calendario de este canal
+  const keepNames = new Set(channels.map(c => c.name));
   if (userData.calendar) {
-    for (const date in userData.calendar) {
-      if (userData.calendar[date][name]) {
-        delete userData.calendar[date][name];
+    for (const dateKey of Object.keys(userData.calendar)) {
+      const dayData = userData.calendar[dateKey];
+      if (!dayData || typeof dayData !== 'object') continue;
+
+      for (const channelNameInCalendar of Object.keys(dayData)) {
+        if (!keepNames.has(channelNameInCalendar)) {
+          delete dayData[channelNameInCalendar];
+        }
       }
     }
   }
-  
+
   await saveData();
   renderChannels();
   renderCalendar();
   updateSettingsExtras();
-  
-  console.log(`✅ Canal "${name}" eliminado permanentemente`);
+  console.log(`✅ Canal "${name}" eliminado permanentemente.`);
 }
 
 function renderChannels() {
@@ -609,9 +675,17 @@ async function calculateAndDisplayStreak() {
   let streakCount = 0;
   let checkDate = new Date(today);
 
+  // Si el día de hoy está completo, empezamos a contar desde 1 y revisamos ayer.
+  // Si no, empezamos en 0 y revisamos desde ayer para ver si la racha se rompió.
   if (isTodayComplete) {
-    streakCount = 1;
-    checkDate.setDate(checkDate.getDate() - 1);
+      streakCount = 1;
+      let yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      checkDate = yesterday;
+  } else {
+      let yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      checkDate = yesterday;
   }
 
   while (true) {
@@ -625,12 +699,14 @@ async function calculateAndDisplayStreak() {
     } else {
       break;
     }
-    if (streakCount > 365) break;
+    if (streakCount > 3650) break; // Límite generoso
   }
-
-  userData.streak = streakCount;
-  userData.lastLoginDate = todayDateKey;
-  await saveData();
+  
+  // Guardar la racha solo si ha cambiado.
+  if (userData.streak !== streakCount) {
+    userData.streak = streakCount;
+    await saveData();
+  }
 
   currentStreakDisplay.innerText = `${streakCount} día${streakCount !== 1 ? 's' : ''}`;
 }
@@ -678,7 +754,7 @@ const achievementDefinitions = {
     }
   },
   'first_streak': {
-    title: 'Primer Racha',
+    title: 'En Racha',
     description: '¡Mantén una racha de 3 días!',
     check: (data) => data.streak >= 3
   },
@@ -693,7 +769,7 @@ const achievementDefinitions = {
     check: (data) => data.streak >= 30
   },
   'new_channel': {
-    title: 'Nuevo Canal',
+    title: 'Diversificando',
     description: '¡Añade tu segundo canal!',
     check: (data) => data.channels.length >= 2
   },
@@ -706,7 +782,6 @@ const achievementDefinitions = {
 
 async function checkAchievements() {
   if (!currentUser || !userData) return;
-
   if (!userData.achievements) userData.achievements = [];
 
   let achievementsUpdated = false;
