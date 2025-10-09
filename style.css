@@ -496,6 +496,66 @@ body {
     transform: scale(1.1);
 }
 
+/* --- Estilos para la función de Editar Canal --- */
+.edit-btn {
+  background-color: #f39c12; /* Naranja */
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  font-size: 1.1em;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s;
+  margin-left: 10px;
+}
+.edit-btn:hover {
+  background-color: #e67e22;
+  transform: scale(1.1);
+}
+
+#channelList li {
+  align-items: center;
+}
+
+#channelList li span {
+  flex-grow: 1;
+}
+
+#editChannelStyle {
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--text-color-primary);
+  font-family: 'Poppins', sans-serif;
+  resize: vertical;
+}
+
+.form-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+/* Estilos para mostrar la info del canal en el checklist */
+.channel-style-info {
+  background-color: rgba(0,0,0,0.1);
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 15px;
+  border-left: 4px solid var(--accent-color);
+}
+.channel-style-info p {
+  margin: 5px 0;
+  font-size: 0.85em;
+  color: var(--text-color-secondary);
+}
+.channel-style-info p strong {
+  color: var(--text-color-primary);
+}
+
 /* ========================================
    AUTENTICACIÓN
    ======================================== */

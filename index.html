@@ -19,7 +19,6 @@
 <body>
   <div id="app-wrapper">
     <div id="container">
-      <!-- Header con navegación -->
       <div id="header">
         <div id="monthDisplay"></div>
         <div class="nav-buttons">
@@ -28,32 +27,26 @@
         </div>
       </div>
 
-      <!-- Días de la semana (lunes primero) -->
       <div id="weekdays">
         <div>Lun</div><div>Mar</div><div>Mié</div><div>Jue</div><div>Vie</div><div>Sáb</div><div>Dom</div>
       </div>
 
-      <!-- Calendario principal -->
       <div id="calendar"></div>
 
-      <!-- Barra de progreso semanal -->
       <div id="weeklyProgressBar" class="progress-bar-container">
         <div class="progress-bar-label">Semanal: <span id="weeklyProgressText">0/0</span></div>
         <div class="progress-bar-fill"></div>
       </div>
 
-      <!-- Botones -->
       <button id="settingsButton" class="settings-btn">⚙️ Configuración</button>
       <button id="achievementsButton" class="settings-btn">🏆 Logros</button>
 
-      <!-- Autenticación -->
       <div id="authContainer">
         <p id="userStatus" class="user-status">No hay sesión iniciada.</p>
         <button id="googleSignInButton" class="action-button google-button">Iniciar Sesión con Google</button>
         <button id="signOutButton" class="action-button google-button hide">Cerrar Sesión</button>
       </div>
 
-      <!-- Racha -->
       <div id="streakContainer" class="streak-container">
         <span class="streak-label">🔥 Racha: </span>
         <span id="currentStreak" class="streak-value">0 días</span>
@@ -61,7 +54,6 @@
     </div>
   </div>
 
-  <!-- Modal Checklist Diario -->
   <div id="checklistModal" class="modal-backdrop hide">
     <div class="modal-content">
       <h3 id="checklistTitle"></h3>
@@ -74,7 +66,6 @@
     </div>
   </div>
 
-  <!-- Modal Configuración -->
   <div id="setupModal" class="modal-backdrop hide">
     <div class="modal-content">
       <h3>Configuración General</h3>
@@ -98,7 +89,6 @@
     </div>
   </div>
 
-  <!-- Modal Logros -->
   <div id="achievementsModal" class="modal-backdrop hide">
     <div class="modal-content">
       <h3>Tus Logros</h3>
@@ -109,14 +99,39 @@
     </div>
   </div>
 
-  <!-- Firebase SDK (Compat v9) -->
+  <div id="editChannelModal" class="modal-backdrop hide">
+    <div class="modal-content">
+      <h3>Editar Detalles del Canal</h3>
+      <form id="editChannelForm">
+        <input type="hidden" id="editChannelId">
+        <div class="config-section">
+          <label for="editChannelName">Nombre del Canal</label>
+          <input type="text" id="editChannelName" required>
+        </div>
+        <div class="config-section">
+          <label for="editChannelVoice">Tipo de Voz</label>
+          <input type="text" id="editChannelVoice" placeholder="Ej: Narrador profundo y serio">
+        </div>
+        <div class="config-section">
+          <label for="editChannelMusic">Música de Fondo</label>
+          <input type="text" id="editChannelMusic" placeholder="Ej: Pista de misterio, sin copyright">
+        </div>
+        <div class="config-section">
+          <label for="editChannelStyle">Notas de Estilo de Imagen</label>
+          <textarea id="editChannelStyle" rows="3" placeholder="Ej: Colores fríos, imágenes 'found footage'..."></textarea>
+        </div>
+        <div class="form-buttons">
+          <button type="submit" class="action-button primary-button">Guardar Cambios</button>
+          <button type="button" id="closeEditModalButton" class="action-button close-button">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  </div>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
 
-  <!-- Config de Firebase -->
   <script>
-    // ⚠️ Reemplaza con tus propias credenciales de Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyBYnadc2ocMk4F_j9Mbq8T2QqEuaweJoLQ",
       authDomain: "micalendariodefinitivo.firebaseapp.com",
@@ -131,7 +146,6 @@
     const db = app.firestore();
   </script>
 
-  <!-- Script principal -->
   <script src="script.js"></script>
 </body>
 </html>

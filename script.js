@@ -1,12 +1,12 @@
 // ======================================================
-// scripts.js - VERSIÓN FINAL Y CORREGIDA
-// Incluye todas las mejoras y soluciones de errores.
+// scripts.js - VERSIÓN CON EDICIÓN DE CANALES
+// Incorpora la funcionalidad para editar nombres y añadir detalles de estilo.
 // ======================================================
 
 // --- VARIABLES GLOBALES Y SELECTORES ---
 let nav = 0;
 let clicked = null;
-let channels = [];
+let channels = []; // Ahora será un array de objetos: [{id, name, voice, music, style}]
 let currentUser = null;
 let userData = null;
 
@@ -38,6 +38,16 @@ const achievementsButton = document.getElementById('achievementsButton');
 const closeSetupButton = document.getElementById('closeSetupButton');
 const closeChecklistButton = document.getElementById('closeChecklistButton');
 const closeAchievementsButton = document.getElementById('closeAchievementsButton');
+
+// NUEVOS SELECTORES PARA EL MODAL DE EDICIÓN
+const editChannelModal = document.getElementById('editChannelModal');
+const editChannelForm = document.getElementById('editChannelForm');
+const editChannelIdInput = document.getElementById('editChannelId');
+const editChannelNameInput = document.getElementById('editChannelName');
+const editChannelVoiceInput = document.getElementById('editChannelVoice');
+const editChannelMusicInput = document.getElementById('editChannelMusic');
+const editChannelStyleInput = document.getElementById('editChannelStyle');
+const closeEditModalButton = document.getElementById('closeEditModalButton');
 
 
 // --- HELPERS DE CONTEO Y UTILIDAD ---
@@ -71,103 +81,99 @@ function genId() {
 }
 
 function getOrphanChannelNames() {
-  const inCalendar = new Set();
-  const valid = (n) => {
-    const s = (n ?? '').toString().trim();
-    return s && s.toLowerCase() !== 'undefined';
-  };
-  if (userData?.calendar && typeof userData.calendar === 'object') {
+    if (!userData || !userData.calendar) return [];
+    const inCalendar = new Set();
+    const valid = (n) => {
+        const s = (n ?? '').toString().trim();
+        return s && s.toLowerCase() !== 'undefined';
+    };
     for (const dateKey of Object.keys(userData.calendar)) {
-      const day = userData.calendar[dateKey];
-      if (!day || typeof day !== 'object') continue;
-      for (const ch of Object.keys(day)) {
-        if (valid(ch)) inCalendar.add(ch);
-      }
+        const day = userData.calendar[dateKey];
+        if (!day || typeof day !== 'object') continue;
+        for (const ch of Object.keys(day)) {
+            if (valid(ch)) inCalendar.add(ch);
+        }
     }
-  }
-  const inChannels = new Set((channels || []).map(c => c.name));
-  return [...inCalendar].filter(name => !inChannels.has(name));
+    // Ahora `channels` es un array de objetos, por lo que extraemos los nombres.
+    const inChannels = new Set((channels || []).map(c => c.name));
+    return [...inCalendar].filter(name => !inChannels.has(name));
 }
 
 // --- FUNCIONES DE MANTENIMIENTO Y REPARACIÓN ---
 
-/**
- * (SEGURO) Migra y repara userData sin revivir canales eliminados.
- */
 async function migrateAndRepairUserData() {
-  if (!userData) return;
+    if (!userData) return;
 
-  let changed = false;
-  const original = Array.isArray(userData.channels) ? userData.channels : [];
-  const normalized = [];
-  const seen = new Set();
-
-  for (const item of original) {
-    if (typeof item === 'string') {
-      const name = item.trim();
-      if (name && name.toLowerCase() !== 'undefined') {
-        const key = name.toLowerCase();
-        if (!seen.has(key)) {
-          normalized.push({ id: genId(), name });
-          seen.add(key);
-          changed = true;
-        }
-      }
-    } else if (item && typeof item === 'object') {
-      const name = (item.name ?? item.channel ?? '').toString().trim();
-      if (name && name.toLowerCase() !== 'undefined') {
-        const key = name.toLowerCase();
-        if (!seen.has(key)) {
-          normalized.push({ id: item.id || genId(), name });
-          seen.add(key);
-        }
-      } else {
-        changed = true;
-      }
+    let changed = false;
+    
+    // --- MIGRACIÓN AUTOMÁTICA DE LA ESTRUCTURA DE CANALES ---
+    // Si detectamos que `channels` es un array de strings, lo convertimos a objetos.
+    if (userData.channels && userData.channels.length > 0 && typeof userData.channels[0] === 'string') {
+        console.log("Migrando estructura de canales de strings a objetos...");
+        userData.channels = userData.channels.map(name => ({
+            id: genId(),
+            name: name,
+            voice: '',
+            music: '',
+            style: ''
+        }));
+        changed = true; // Forzamos un guardado para persistir la nueva estructura.
     }
-  }
+    
+    const original = Array.isArray(userData.channels) ? userData.channels.slice() : []; // Usamos slice para clonar
+    let normalized = [];
 
-  if (userData.calendar && typeof userData.calendar === 'object') {
-    for (const dateKey of Object.keys(userData.calendar)) {
-      const day = userData.calendar[dateKey];
-      if (!day || typeof day !== 'object') continue;
-
-      if (Object.prototype.hasOwnProperty.call(day, 'undefined')) {
-        delete day['undefined'];
-        changed = true;
-      }
-
-      for (const channelName of Object.keys(day)) {
-        const items = day[channelName];
-        if (items && typeof items === 'object') {
-          for (const sId of Object.keys(items)) {
-            const s = items[sId];
-            if (s === 'fail') {
-              items[sId] = 'pending';
-              changed = true;
-            }
-            if (s === 'inprogress') {
-              items[sId] = 'in_progress';
-              changed = true;
-            }
-          }
+    // Nos aseguramos de que cada canal sea un objeto con ID.
+    for (const item of original) {
+        if (typeof item === 'object' && item.name) {
+            normalized.push({
+                id: item.id || genId(),
+                name: item.name,
+                voice: item.voice || '',
+                music: item.music || '',
+                style: item.style || ''
+            });
+        } else if (typeof item === 'string') { // Doble seguridad por si algo sale mal
+            normalized.push({ id: genId(), name: item, voice: '', music: '', style: '' });
+            changed = true;
         }
-      }
     }
-  }
+    
+    if(changed) {
+        userData.channels = normalized;
+    }
 
-  if (changed || normalized.length !== original.length) {
-    userData.channels = normalized;
-    channels = normalized;
-    await saveData();
-  } else {
-    channels = original;
-  }
+    if (userData.calendar && typeof userData.calendar === 'object') {
+        for (const dateKey of Object.keys(userData.calendar)) {
+            const day = userData.calendar[dateKey];
+            if (!day || typeof day !== 'object') continue;
+
+            if (Object.prototype.hasOwnProperty.call(day, 'undefined')) {
+                delete day['undefined'];
+                changed = true;
+            }
+
+            for (const channelName of Object.keys(day)) {
+                const items = day[channelName];
+                if (items && typeof items === 'object') {
+                    for (const sId of Object.keys(items)) {
+                        const s = items[sId];
+                        if (s === 'fail') { items[sId] = 'pending'; changed = true; }
+                        if (s === 'inprogress') { items[sId] = 'in_progress'; changed = true; }
+                    }
+                }
+            }
+        }
+    }
+
+    if (changed) {
+        channels = userData.channels;
+        await saveData();
+    } else {
+        channels = original;
+    }
 }
 
-/**
- * (ROBUSTO) Purga del calendario todas las entradas de canales que NO estén en `channels`.
- */
 async function purgeOrphanChannelsFromCalendar() {
   if (!userData?.calendar) return;
 
@@ -208,9 +214,6 @@ async function purgeOrphanChannelsFromCalendar() {
   }
 }
 
-/**
- * (HERRAMIENTA DE DEBUG) Limpieza forzada para ejecutar desde la consola.
- */
 async function forceCleanOrphans() {
   console.log("--- INICIANDO LIMPIEZA FORZADA ---");
 
@@ -233,8 +236,7 @@ async function forceCleanOrphans() {
   }
 
   if (orphans.size === 0) {
-    console.log("✅ No se encontraron canales huérfanos en el calendario. La base de datos parece estar limpia.");
-    console.log("--- FIN DE LA LIMPIEZA ---");
+    console.log("✅ No se encontraron canales huérfanos.");
     return;
   }
 
@@ -256,15 +258,12 @@ async function forceCleanOrphans() {
     console.log("Guardando el estado limpio en Firestore...");
     await saveData();
     console.log("¡Limpieza forzada completada! Recarga la página para verificar.");
-  } else {
-    console.log("No se realizaron cambios, no es necesario guardar.");
   }
 
   console.log("--- FIN DE LA LIMPIEZA ---");
 }
 
 // --- GESTIÓN DE LA INTERFAZ DE CONFIGURACIÓN ---
-
 function ensureSettingsExtras() {
   const section = channelList?.closest('.config-section');
   if (!section) return;
@@ -284,9 +283,7 @@ function ensureSettingsExtras() {
     cleanBtn.className = 'action-button close-button';
     cleanBtn.textContent = 'Eliminar canales huérfanos del calendario';
     cleanBtn.style.marginTop = '8px';
-    cleanBtn.addEventListener('click', async () => {
-      await purgeOrphanChannelsFromCalendar();
-    });
+    cleanBtn.addEventListener('click', () => purgeOrphanChannelsFromCalendar());
     section.appendChild(cleanBtn);
   }
 
@@ -298,10 +295,10 @@ function updateSettingsExtras() {
   if (!stats) return;
   const orphanCount = getOrphanChannelNames().length;
   stats.textContent = `Canales: ${channels.length} · Huérfanos en calendario: ${orphanCount}`;
-  
+
   const cleanBtn = document.getElementById('cleanOrphansButton');
   if (cleanBtn) {
-      cleanBtn.style.display = orphanCount > 0 ? 'block' : 'none';
+    cleanBtn.style.display = orphanCount > 0 ? 'block' : 'none';
   }
 }
 
@@ -311,7 +308,7 @@ async function signInWithGoogle() {
   try {
     await auth.signInWithPopup(provider);
   } catch (error) {
-    console.error("Error al iniciar sesión con Google:", error);
+    console.error("Error al iniciar sesión:", error);
     alert("Error al iniciar sesión: " + error.message);
   }
 }
@@ -344,13 +341,8 @@ async function handleAuthStatus(user) {
     renderCalendar();
     renderChannels();
     currentStreakDisplay.innerText = '0 días';
-    dailyProgressBarFill.style.width = '0%';
-    dailyProgressText.innerText = '0/0';
-    weeklyProgressBarFill.style.width = '0%';
-    weeklyProgressText.innerText = '0/0';
   }
 }
-
 
 // --- PERSISTENCIA (Firestore) ---
 async function loadData(uid) {
@@ -360,7 +352,7 @@ async function loadData(uid) {
     const doc = await docRef.get();
     if (doc.exists) {
       userData = doc.data();
-      await migrateAndRepairUserData();
+      await migrateAndRepairUserData(); // Esta función ahora se encarga de la migración
       channels = userData.channels || [];
       shortsPerChannelInput.value = userData.shortsPerChannel || 2;
     } else {
@@ -373,7 +365,6 @@ async function loadData(uid) {
         achievements: []
       };
       channels = [];
-      shortsPerChannelInput.value = 2;
       await saveData();
     }
   } catch (error) {
@@ -399,13 +390,10 @@ async function saveData() {
 function renderCalendar() {
   const dt = new Date();
   if (nav !== 0) dt.setMonth(new Date().getMonth() + nav);
-
   const month = dt.getMonth();
   const year = dt.getFullYear();
-
   const firstDayOfMonth = new Date(year, month, 1);
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-
   const firstDayWeekday = firstDayOfMonth.getDay();
   const paddingDays = (firstDayWeekday + 6) % 7;
 
@@ -417,10 +405,7 @@ function renderCalendar() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const startOfWeek = new Date(today);
-  const currentDayOfWeek = today.getDay();
-  const daysFromMonday = (currentDayOfWeek + 6) % 7;
-  startOfWeek.setDate(today.getDate() - daysFromMonday);
-  startOfWeek.setHours(0, 0, 0, 0);
+  startOfWeek.setDate(today.getDate() - ((today.getDay() + 6) % 7));
   const endOfWeek = new Date(startOfWeek);
   endOfWeek.setDate(startOfWeek.getDate() + 7);
 
@@ -434,18 +419,12 @@ function renderCalendar() {
     const dayBox = document.createElement('div');
     dayBox.classList.add('day');
     dayBox.innerText = dayNumber;
-
     const currentDay = new Date(year, month, dayNumber);
     currentDay.setHours(0, 0, 0, 0);
-
     if (currentDay.getTime() === today.getTime()) {
       dayBox.classList.add('current-day');
     }
-
-    const formattedDay = dayNumber < 10 ? '0' + dayNumber : String(dayNumber);
-    const formattedMonth = (month + 1) < 10 ? '0' + (month + 1) : String(month + 1);
-    const dateKey = `${year}-${formattedMonth}-${formattedDay}`;
-
+    const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNumber).padStart(2, '0')}`;
     const dayData = userData?.calendar?.[dateKey];
     const totalForDay = (channels.length || 0) * (userData?.shortsPerChannel || 0);
     const completedForDay = countDoneStatuses(dayData);
@@ -457,23 +436,16 @@ function renderCalendar() {
       progressBar.classList.add('day-progress-bar');
       progressBar.style.width = `${progressPercentage}%`;
       dayBox.appendChild(progressBar);
-
-      if (progressPercentage === 100) {
-        dayBox.classList.add('completed-day');
-      } else if (completedForDay > 0 || inProgressToday) {
-        dayBox.classList.add('partial-day');
-      } else {
-        dayBox.classList.add('pending-day');
-      }
+      if (progressPercentage === 100) dayBox.classList.add('completed-day');
+      else if (completedForDay > 0 || inProgressToday) dayBox.classList.add('partial-day');
+      else dayBox.classList.add('pending-day');
     }
-
     dayBox.addEventListener('click', () => openChecklistModal(dateKey));
 
     if (currentUser && currentDay >= startOfWeek && currentDay < endOfWeek) {
       totalVideosThisWeek += totalForDay;
       completedVideosThisWeek += completedForDay;
     }
-
     calendar.appendChild(dayBox);
   }
 
@@ -494,73 +466,85 @@ function updateWeeklyProgressBar(completed, total) {
 }
 
 
-// --- CANALES ---
+// --- CANALES (ACTUALIZADO PARA OBJETOS) ---
 async function addChannel(name) {
   if (!name || !currentUser) return;
   name = name.toString().trim();
-  if (!name || name.toLowerCase() === 'undefined') {
-    alert('Nombre de canal no válido.');
-    return;
-  }
-  if (!channels.some(c => c.name.toLowerCase() === name.toLowerCase())) {
-    channels.push({ id: genId(), name });
-    await saveData();
-    renderChannels();
-    renderCalendar();
-    updateSettingsExtras();
-  } else {
+  if (channels.some(c => c.name.toLowerCase() === name.toLowerCase())) {
     alert('Este canal ya existe.');
-  }
-}
-
-async function removeChannel(name) {
-  if (!currentUser) return;
-
-  if (!confirm(`¿Estás seguro de que quieres eliminar el canal "${name}"? Esta acción es permanente y borrará todos sus datos.`)) {
     return;
   }
-
-  channels = channels.filter(c => c.name !== name);
-
-  const keepNames = new Set(channels.map(c => c.name));
-  if (userData.calendar) {
-    for (const dateKey of Object.keys(userData.calendar)) {
-      const dayData = userData.calendar[dateKey];
-      if (!dayData || typeof dayData !== 'object') continue;
-
-      for (const channelNameInCalendar of Object.keys(dayData)) {
-        if (!keepNames.has(channelNameInCalendar)) {
-          delete dayData[channelNameInCalendar];
-        }
-      }
-    }
-  }
-
+  const newChannel = {
+    id: genId(),
+    name: name,
+    voice: '',
+    music: '',
+    style: ''
+  };
+  channels.push(newChannel);
   await saveData();
   renderChannels();
   renderCalendar();
   updateSettingsExtras();
-  console.log(`✅ Canal "${name}" eliminado permanentemente.`);
+}
+
+async function removeChannel(channelId) {
+    const channelToRemove = channels.find(c => c.id === channelId);
+    if (!channelToRemove) return;
+    if (!confirm(`¿Estás seguro de que quieres eliminar el canal "${channelToRemove.name}"? Esta acción es permanente.`)) {
+        return;
+    }
+    channels = channels.filter(c => c.id !== channelId);
+    // Además de borrar el canal de la lista, limpiamos sus datos del calendario
+    if (userData.calendar) {
+        for (const dateKey in userData.calendar) {
+            if (userData.calendar[dateKey][channelToRemove.name]) {
+                delete userData.calendar[dateKey][channelToRemove.name];
+            }
+        }
+    }
+    await saveData();
+    renderChannels();
+    renderCalendar();
+    updateSettingsExtras();
+    console.log(`✅ Canal "${channelToRemove.name}" eliminado.`);
 }
 
 function renderChannels() {
-  channelList.innerHTML = '';
-  if (channels.length === 0) {
-    const li = document.createElement('li');
-    li.innerText = 'No hay canales. ¡Añade uno!';
-    channelList.appendChild(li);
-  } else {
+    channelList.innerHTML = '';
+    if (!channels || channels.length === 0) {
+        const li = document.createElement('li');
+        li.innerText = 'No hay canales. ¡Añade uno!';
+        channelList.appendChild(li);
+        return;
+    }
+    
     channels.sort((a, b) => a.name.localeCompare(b.name));
     channels.forEach(channel => {
-      const li = document.createElement('li');
-      li.innerHTML = `
-        <span>${channel.name}</span>
-        <button class="remove-btn" title="Eliminar canal">-</button>
-      `;
-      li.querySelector('.remove-btn').addEventListener('click', () => removeChannel(channel.name));
-      channelList.appendChild(li);
+        const li = document.createElement('li');
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = channel.name;
+        
+        const buttonsDiv = document.createElement('div');
+        
+        const editBtn = document.createElement('button');
+        editBtn.className = 'edit-btn';
+        editBtn.innerHTML = '✏️';
+        editBtn.title = 'Editar detalles';
+        editBtn.addEventListener('click', () => openEditModal(channel.id));
+        
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'remove-btn';
+        removeBtn.innerHTML = '-';
+        removeBtn.title = 'Eliminar canal';
+        removeBtn.addEventListener('click', () => removeChannel(channel.id));
+        
+        buttonsDiv.appendChild(editBtn);
+        buttonsDiv.appendChild(removeBtn);
+        li.appendChild(nameSpan);
+        li.appendChild(buttonsDiv);
+        channelList.appendChild(li);
     });
-  }
 }
 
 async function updateShortsPerChannel() {
@@ -575,13 +559,58 @@ async function updateShortsPerChannel() {
   renderCalendar();
 }
 
-
-// --- CHECKLIST ---
-function openChecklistModal(date) {
-  if (!currentUser) {
-    alert('Por favor, inicia sesión para gestionar tu calendario.');
-    return;
+// --- EDICIÓN DE CANAL (NUEVAS FUNCIONES) ---
+function openEditModal(channelId) {
+  const channel = channels.find(c => c.id === channelId);
+  if (channel) {
+    editChannelIdInput.value = channel.id;
+    editChannelNameInput.value = channel.name;
+    editChannelVoiceInput.value = channel.voice || '';
+    editChannelMusicInput.value = channel.music || '';
+    editChannelStyleInput.value = channel.style || '';
+    editChannelModal.classList.remove('hide');
   }
+}
+
+function closeEditModal() {
+  editChannelModal.classList.add('hide');
+}
+
+async function saveChannelEdit(event) {
+  event.preventDefault();
+  const channelId = editChannelIdInput.value;
+  const channelIndex = channels.findIndex(c => c.id === channelId);
+
+  if (channelIndex > -1) {
+    const oldName = channels[channelIndex].name;
+    const newName = editChannelNameInput.value.trim();
+
+    channels[channelIndex].name = newName;
+    channels[channelIndex].voice = editChannelVoiceInput.value.trim();
+    channels[channelIndex].music = editChannelMusicInput.value.trim();
+    channels[channelIndex].style = editChannelStyleInput.value.trim();
+
+    // Si el nombre del canal cambió, debemos actualizarlo en el calendario
+    if (oldName !== newName && userData.calendar) {
+        for (const dateKey in userData.calendar) {
+            if (userData.calendar[dateKey][oldName]) {
+                userData.calendar[dateKey][newName] = userData.calendar[dateKey][oldName];
+                delete userData.calendar[dateKey][oldName];
+            }
+        }
+    }
+
+    await saveData();
+    renderChannels();
+    renderCalendar(); // Para reflejar cualquier cambio de nombre en el progreso
+    closeEditModal();
+  }
+}
+
+
+// --- CHECKLIST (ACTUALIZADO) ---
+function openChecklistModal(date) {
+  if (!currentUser) return;
   clicked = date;
   checklistTitle.innerText = `Contenido para ${new Date(date + 'T00:00:00').toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`;
   checklistContainer.innerHTML = '';
@@ -590,20 +619,27 @@ function openChecklistModal(date) {
   let completedShortsToday = 0;
 
   if (channels.length === 0) {
-    checklistContainer.innerHTML = '<p>Añade canales en Configuración para empezar a planificar.</p>';
+    checklistContainer.innerHTML = '<p>Añade canales en Configuración para empezar.</p>';
   } else {
     channels.forEach(channel => {
       const channelDiv = document.createElement('div');
       channelDiv.classList.add('channel-checklist-group');
       channelDiv.innerHTML = `<h4>${channel.name}</h4>`;
-      checklistContainer.appendChild(channelDiv);
+      
+      const styleInfoDiv = document.createElement('div');
+      styleInfoDiv.className = 'channel-style-info';
+      styleInfoDiv.innerHTML = `
+        <p><strong>Voz:</strong> ${channel.voice || 'No especificada'}</p>
+        <p><strong>Música:</strong> ${channel.music || 'No especificada'}</p>
+        <p><strong>Estilo:</strong> ${channel.style || 'No especificado'}</p>
+      `;
+      channelDiv.appendChild(styleInfoDiv);
 
       const numShorts = userData?.shortsPerChannel || 0;
       for (let i = 0; i < numShorts; i++) {
         const shortId = `short_${i}`;
         const currentStatus = userData?.calendar?.[date]?.[channel.name]?.[shortId] || 'pending';
         if (currentStatus === 'done') completedShortsToday++;
-
         const row = document.createElement('div');
         row.classList.add('checklist-item');
         row.innerHTML = `
@@ -614,19 +650,19 @@ function openChecklistModal(date) {
             <button class="status-btn done ${currentStatus === 'done' ? 'active' : ''}" data-status="done" title="Subido">✅</button>
           </div>
         `;
-        channelDiv.appendChild(row);
-
         row.querySelectorAll('.status-btn').forEach(button => {
           button.addEventListener('click', async (e) => {
             const newStatus = e.currentTarget.dataset.status;
             await updateShortStatus(date, channel.name, shortId, newStatus);
-            openChecklistModal(date);
+            openChecklistModal(date); // Recargamos el modal para actualizar contadores
             renderCalendar();
             calculateAndDisplayStreak();
             checkAchievements();
           });
         });
+        channelDiv.appendChild(row);
       }
+      checklistContainer.appendChild(channelDiv);
     });
   }
 
@@ -659,138 +695,67 @@ async function updateShortStatus(date, channelName, shortId, status) {
 
 // --- RACHA ---
 async function calculateAndDisplayStreak() {
-  if (!currentUser || !userData) {
-    currentStreakDisplay.innerText = '0 días';
-    return;
-  }
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const todayDateKey = today.toISOString().split('T')[0];
-
-  const totalExpectedToday = (channels.length || 0) * (userData.shortsPerChannel || 0);
-  const completedToday = countDoneStatuses(userData.calendar?.[todayDateKey]);
-  const isTodayComplete = totalExpectedToday > 0 && completedToday === totalExpectedToday;
-
-  let streakCount = 0;
-  let checkDate = new Date(today);
-
-  // Si el día de hoy está completo, empezamos a contar desde 1 y revisamos ayer.
-  // Si no, empezamos en 0 y revisamos desde ayer para ver si la racha se rompió.
-  if (isTodayComplete) {
-      streakCount = 1;
-      let yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
-      checkDate = yesterday;
-  } else {
-      let yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
-      checkDate = yesterday;
-  }
-
-  while (true) {
-    const dateKey = checkDate.toISOString().split('T')[0];
-    const totalExpected = (channels.length || 0) * (userData.shortsPerChannel || 0);
-    const completed = countDoneStatuses(userData.calendar?.[dateKey]);
-
-    if (totalExpected > 0 && completed === totalExpected) {
-      streakCount++;
-      checkDate.setDate(checkDate.getDate() - 1);
-    } else {
-      break;
+    if (!currentUser || !userData) {
+        currentStreakDisplay.innerText = '0 días';
+        return;
     }
-    if (streakCount > 3650) break; // Límite generoso
-  }
-  
-  // Guardar la racha solo si ha cambiado.
-  if (userData.streak !== streakCount) {
-    userData.streak = streakCount;
-    await saveData();
-  }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let streakCount = 0;
+    let checkDate = new Date(today);
 
-  currentStreakDisplay.innerText = `${streakCount} día${streakCount !== 1 ? 's' : ''}`;
+    // Bucle para contar la racha hacia atrás
+    while (true) {
+        const dateKey = checkDate.toISOString().split('T')[0];
+        const totalExpected = (channels.length || 0) * (userData.shortsPerChannel || 0);
+        const completed = countDoneStatuses(userData.calendar?.[dateKey]);
+        
+        if (totalExpected > 0 && completed === totalExpected) {
+            streakCount++;
+            checkDate.setDate(checkDate.getDate() - 1); // Retrocedemos un día
+        } else {
+            // Si el día de hoy no está completo, la racha de hoy es 0,
+            // pero la racha "guardada" podría ser de ayer.
+            // Si el día que falla no es hoy, rompemos.
+            if (checkDate.getTime() !== today.getTime()) {
+                break;
+            }
+            // Si es hoy el que falla, la racha es 0 y rompemos.
+            streakCount = 0;
+            break;
+        }
+        if (streakCount > 3650) break;
+    }
+
+    if (userData.streak !== streakCount) {
+        userData.streak = streakCount;
+        await saveData();
+    }
+    currentStreakDisplay.innerText = `${streakCount} día${streakCount !== 1 ? 's' : ''}`;
 }
 
 
 // --- LOGROS ---
 const achievementDefinitions = {
-  'first_short': {
-    title: 'Primer Short',
-    description: '¡Publica tu primer short!',
-    check: (data) => {
-      let totalCompleted = 0;
-      for (const dateKey in data.calendar) {
-        for (const channelName in data.calendar[dateKey]) {
-          totalCompleted += Object.values(data.calendar[dateKey][channelName]).filter(s => s === 'done').length;
-        }
-      }
-      return totalCompleted >= 1;
-    }
-  },
-  'five_shorts': {
-    title: 'Cinco Shorts',
-    description: '¡Publica cinco shorts!',
-    check: (data) => {
-      let totalCompleted = 0;
-      for (const dateKey in data.calendar) {
-        for (const channelName in data.calendar[dateKey]) {
-          totalCompleted += Object.values(data.calendar[dateKey][channelName]).filter(s => s === 'done').length;
-        }
-      }
-      return totalCompleted >= 5;
-    }
-  },
-  'ten_shorts': {
-    title: 'Diez Shorts',
-    description: '¡Publica diez shorts!',
-    check: (data) => {
-      let totalCompleted = 0;
-      for (const dateKey in data.calendar) {
-        for (const channelName in data.calendar[dateKey]) {
-          totalCompleted += Object.values(data.calendar[dateKey][channelName]).filter(s => s === 'done').length;
-        }
-      }
-      return totalCompleted >= 10;
-    }
-  },
-  'first_streak': {
-    title: 'En Racha',
-    description: '¡Mantén una racha de 3 días!',
-    check: (data) => data.streak >= 3
-  },
-  'seven_streak': {
-    title: 'Racha de la Semana',
-    description: '¡Mantén una racha de 7 días!',
-    check: (data) => data.streak >= 7
-  },
-  'thirty_streak': {
-    title: 'Racha Legendaria',
-    description: '¡Mantén una racha de 30 días!',
-    check: (data) => data.streak >= 30
-  },
-  'new_channel': {
-    title: 'Diversificando',
-    description: '¡Añade tu segundo canal!',
-    check: (data) => data.channels.length >= 2
-  },
-  'three_channels': {
-    title: 'Creador Múltiple',
-    description: '¡Gestiona 3 canales!',
-    check: (data) => data.channels.length >= 3
-  }
+  'first_short': { title: 'Primer Short', description: '¡Publica tu primer short!', check: (data) => Object.keys(data.calendar || {}).length > 0 },
+  'five_shorts': { title: 'Cinco Shorts', description: '¡Publica cinco shorts!', check: (data) => { let c=0; for(const d in data.calendar) for(const ch in data.calendar[d]) c+=Object.values(data.calendar[d][ch]).filter(s=>s==='done').length; return c>=5; } },
+  'ten_shorts': { title: 'Diez Shorts', description: '¡Publica diez shorts!', check: (data) => { let c=0; for(const d in data.calendar) for(const ch in data.calendar[d]) c+=Object.values(data.calendar[d][ch]).filter(s=>s==='done').length; return c>=10; } },
+  'first_streak': { title: 'En Racha', description: '¡Mantén una racha de 3 días!', check: (data) => data.streak >= 3 },
+  'seven_streak': { title: 'Racha de la Semana', description: '¡Mantén una racha de 7 días!', check: (data) => data.streak >= 7 },
+  'thirty_streak': { title: 'Racha Legendaria', description: '¡Mantén una racha de 30 días!', check: (data) => data.streak >= 30 },
+  'new_channel': { title: 'Diversificando', description: '¡Añade tu segundo canal!', check: (data) => data.channels.length >= 2 },
+  'three_channels': { title: 'Creador Múltiple', description: '¡Gestiona 3 canales!', check: (data) => data.channels.length >= 3 }
 };
 
 async function checkAchievements() {
   if (!currentUser || !userData) return;
   if (!userData.achievements) userData.achievements = [];
-
   let achievementsUpdated = false;
   for (const id in achievementDefinitions) {
-    const achievement = achievementDefinitions[id];
-    if (!userData.achievements.includes(id) && achievement.check(userData)) {
+    if (!userData.achievements.includes(id) && achievementDefinitions[id].check(userData)) {
       userData.achievements.push(id);
       achievementsUpdated = true;
-      showAchievementNotification(achievement.title);
+      showAchievementNotification(achievementDefinitions[id].title);
     }
   }
   if (achievementsUpdated) await saveData();
@@ -807,7 +772,6 @@ function showAchievementNotification(title) {
   `;
   notification.innerHTML = `<strong>🏆 ¡Logro desbloqueado!</strong><br>${title}`;
   document.body.appendChild(notification);
-
   setTimeout(() => {
     notification.style.animation = 'slideOut 0.5s ease';
     setTimeout(() => notification.remove(), 500);
@@ -817,12 +781,10 @@ function showAchievementNotification(title) {
 function renderAchievements() {
   const achievementsContainer = document.getElementById('achievements-container');
   achievementsContainer.innerHTML = '';
-
   if (!currentUser) {
-    achievementsContainer.innerHTML = '<p class="no-achievements">Inicia sesión para ver tus logros.</p>';
+    achievementsContainer.innerHTML = '<p>Inicia sesión para ver tus logros.</p>';
     return;
   }
-
   if (userData.achievements && userData.achievements.length > 0) {
     const ul = document.createElement('ul');
     ul.classList.add('achievements-list');
@@ -843,10 +805,9 @@ function renderAchievements() {
     });
     achievementsContainer.appendChild(ul);
   } else {
-    achievementsContainer.innerHTML = '<p class="no-achievements">Aún no tienes logros. ¡Sigue publicando videos!</p>';
+    achievementsContainer.innerHTML = '<p>Aún no tienes logros. ¡Sigue publicando!</p>';
   }
 }
-
 
 // --- INICIALIZACIÓN / EVENTOS ---
 function init() {
@@ -884,6 +845,10 @@ function init() {
     achievementsModal.classList.remove('hide');
   });
   closeAchievementsButton.addEventListener('click', () => achievementsModal.classList.add('hide'));
+
+  // NUEVOS EVENTOS PARA EL MODAL DE EDICIÓN
+  editChannelForm.addEventListener('submit', saveChannelEdit);
+  closeEditModalButton.addEventListener('click', closeEditModal);
 
   renderCalendar();
 }
