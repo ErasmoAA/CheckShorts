@@ -1,12 +1,12 @@
 // ======================================================
-// scripts.js - VERSIÓN CON EDICIÓN DE CANALES
-// Incorpora la funcionalidad para editar nombres y añadir detalles de estilo.
+// scripts.js - VERSIÓN FINAL Y COMPLETA
+// Incluye Logros, Mantenimiento y todas las funciones de edición.
 // ======================================================
 
 // --- VARIABLES GLOBALES Y SELECTORES ---
 let nav = 0;
 let clicked = null;
-let channels = []; // Ahora será un array de objetos: [{id, name, voice, music, style}]
+let channels = []; // Ahora será un array de objetos: [{id, name, voice, music, style, subtitles, shortsOverride}]
 let currentUser = null;
 let userData = null;
 
@@ -39,14 +39,16 @@ const closeSetupButton = document.getElementById('closeSetupButton');
 const closeChecklistButton = document.getElementById('closeChecklistButton');
 const closeAchievementsButton = document.getElementById('closeAchievementsButton');
 
-// NUEVOS SELECTORES PARA EL MODAL DE EDICIÓN
+// SELECTORES PARA EL MODAL DE EDICIÓN
 const editChannelModal = document.getElementById('editChannelModal');
 const editChannelForm = document.getElementById('editChannelForm');
 const editChannelIdInput = document.getElementById('editChannelId');
 const editChannelNameInput = document.getElementById('editChannelName');
+const editChannelShortsOverrideInput = document.getElementById('editChannelShortsOverride');
 const editChannelVoiceInput = document.getElementById('editChannelVoice');
 const editChannelMusicInput = document.getElementById('editChannelMusic');
 const editChannelStyleInput = document.getElementById('editChannelStyle');
+const editChannelSubtitlesInput = document.getElementById('editChannelSubtitles');
 const closeEditModalButton = document.getElementById('closeEditModalButton');
 
 
@@ -80,99 +82,28 @@ function genId() {
   return 'ch_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 }
 
+function getShortsForChannel(channel) {
+    const globalDefault = parseInt(shortsPerChannelInput.value) || 2;
+    if (channel && channel.shortsOverride && !isNaN(channel.shortsOverride) && channel.shortsOverride > 0) {
+        return channel.shortsOverride;
+    }
+    return globalDefault;
+}
+
 function getOrphanChannelNames() {
     if (!userData || !userData.calendar) return [];
     const inCalendar = new Set();
-    const valid = (n) => {
-        const s = (n ?? '').toString().trim();
-        return s && s.toLowerCase() !== 'undefined';
-    };
     for (const dateKey of Object.keys(userData.calendar)) {
         const day = userData.calendar[dateKey];
-        if (!day || typeof day !== 'object') continue;
-        for (const ch of Object.keys(day)) {
-            if (valid(ch)) inCalendar.add(ch);
+        if (day && typeof day === 'object') {
+            for (const ch of Object.keys(day)) { inCalendar.add(ch); }
         }
     }
-    // Ahora `channels` es un array de objetos, por lo que extraemos los nombres.
     const inChannels = new Set((channels || []).map(c => c.name));
     return [...inCalendar].filter(name => !inChannels.has(name));
 }
 
 // --- FUNCIONES DE MANTENIMIENTO Y REPARACIÓN ---
-
-async function migrateAndRepairUserData() {
-    if (!userData) return;
-
-    let changed = false;
-    
-    // --- MIGRACIÓN AUTOMÁTICA DE LA ESTRUCTURA DE CANALES ---
-    // Si detectamos que `channels` es un array de strings, lo convertimos a objetos.
-    if (userData.channels && userData.channels.length > 0 && typeof userData.channels[0] === 'string') {
-        console.log("Migrando estructura de canales de strings a objetos...");
-        userData.channels = userData.channels.map(name => ({
-            id: genId(),
-            name: name,
-            voice: '',
-            music: '',
-            style: ''
-        }));
-        changed = true; // Forzamos un guardado para persistir la nueva estructura.
-    }
-    
-    const original = Array.isArray(userData.channels) ? userData.channels.slice() : []; // Usamos slice para clonar
-    let normalized = [];
-
-    // Nos aseguramos de que cada canal sea un objeto con ID.
-    for (const item of original) {
-        if (typeof item === 'object' && item.name) {
-            normalized.push({
-                id: item.id || genId(),
-                name: item.name,
-                voice: item.voice || '',
-                music: item.music || '',
-                style: item.style || ''
-            });
-        } else if (typeof item === 'string') { // Doble seguridad por si algo sale mal
-            normalized.push({ id: genId(), name: item, voice: '', music: '', style: '' });
-            changed = true;
-        }
-    }
-    
-    if(changed) {
-        userData.channels = normalized;
-    }
-
-    if (userData.calendar && typeof userData.calendar === 'object') {
-        for (const dateKey of Object.keys(userData.calendar)) {
-            const day = userData.calendar[dateKey];
-            if (!day || typeof day !== 'object') continue;
-
-            if (Object.prototype.hasOwnProperty.call(day, 'undefined')) {
-                delete day['undefined'];
-                changed = true;
-            }
-
-            for (const channelName of Object.keys(day)) {
-                const items = day[channelName];
-                if (items && typeof items === 'object') {
-                    for (const sId of Object.keys(items)) {
-                        const s = items[sId];
-                        if (s === 'fail') { items[sId] = 'pending'; changed = true; }
-                        if (s === 'inprogress') { items[sId] = 'in_progress'; changed = true; }
-                    }
-                }
-            }
-        }
-    }
-
-    if (changed) {
-        channels = userData.channels;
-        await saveData();
-    } else {
-        channels = original;
-    }
-}
 
 async function purgeOrphanChannelsFromCalendar() {
   if (!userData?.calendar) return;
@@ -212,55 +143,6 @@ async function purgeOrphanChannelsFromCalendar() {
   } else {
     alert('No se encontraron canales huérfanos para eliminar.');
   }
-}
-
-async function forceCleanOrphans() {
-  console.log("--- INICIANDO LIMPIEZA FORZADA ---");
-
-  if (!currentUser || !userData) {
-    console.error("Error: Debes iniciar sesión para ejecutar la limpieza.");
-    return;
-  }
-
-  const validChannelNames = new Set(userData.channels.map(c => c.name));
-  console.log("Canales válidos según userData:", Array.from(validChannelNames));
-
-  const orphans = new Set();
-  for (const dateKey in userData.calendar) {
-    const dayData = userData.calendar[dateKey];
-    for (const channelName in dayData) {
-      if (!validChannelNames.has(channelName)) {
-        orphans.add(channelName);
-      }
-    }
-  }
-
-  if (orphans.size === 0) {
-    console.log("✅ No se encontraron canales huérfanos.");
-    return;
-  }
-
-  console.warn("Canales huérfanos encontrados:", Array.from(orphans));
-
-  let changed = false;
-  for (const dateKey in userData.calendar) {
-    const dayData = userData.calendar[dateKey];
-    for (const orphanName of orphans) {
-      if (dayData[orphanName]) {
-        console.log(`Eliminando "${orphanName}" del calendario para la fecha: ${dateKey}`);
-        delete dayData[orphanName];
-        changed = true;
-      }
-    }
-  }
-
-  if (changed) {
-    console.log("Guardando el estado limpio en Firestore...");
-    await saveData();
-    console.log("¡Limpieza forzada completada! Recarga la página para verificar.");
-  }
-
-  console.log("--- FIN DE LA LIMPIEZA ---");
 }
 
 // --- GESTIÓN DE LA INTERFAZ DE CONFIGURACIÓN ---
@@ -352,17 +234,27 @@ async function loadData(uid) {
     const doc = await docRef.get();
     if (doc.exists) {
       userData = doc.data();
-      await migrateAndRepairUserData(); // Esta función ahora se encarga de la migración
+      
+      let needsSave = false;
+      // Migración automática: si los canales son strings, los convierte a objetos completos.
+      if (userData.channels && userData.channels.length > 0 && typeof userData.channels[0] === 'string') {
+        console.log("Migrando estructura de canales de strings a objetos...");
+        userData.channels = userData.channels.map(name => ({
+          id: genId(), name, voice: '', music: '', style: '', subtitles: '', shortsOverride: null
+        }));
+        needsSave = true;
+      }
+
       channels = userData.channels || [];
       shortsPerChannelInput.value = userData.shortsPerChannel || 2;
+      
+      if (needsSave) await saveData();
+
     } else {
       userData = {
-        channels: [],
-        shortsPerChannel: 2,
-        calendar: {},
+        channels: [], shortsPerChannel: 2, calendar: {},
         lastLoginDate: new Date().toISOString().split('T')[0],
-        streak: 0,
-        achievements: []
+        streak: 0, achievements: []
       };
       channels = [];
       await saveData();
@@ -426,7 +318,9 @@ function renderCalendar() {
     }
     const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNumber).padStart(2, '0')}`;
     const dayData = userData?.calendar?.[dateKey];
-    const totalForDay = (channels.length || 0) * (userData?.shortsPerChannel || 0);
+    
+    const totalForDay = channels.reduce((sum, channel) => sum + getShortsForChannel(channel), 0);
+    
     const completedForDay = countDoneStatuses(dayData);
     const inProgressToday = hasInProgress(dayData);
 
@@ -466,7 +360,7 @@ function updateWeeklyProgressBar(completed, total) {
 }
 
 
-// --- CANALES (ACTUALIZADO PARA OBJETOS) ---
+// --- CANALES ---
 async function addChannel(name) {
   if (!name || !currentUser) return;
   name = name.toString().trim();
@@ -479,7 +373,9 @@ async function addChannel(name) {
     name: name,
     voice: '',
     music: '',
-    style: ''
+    style: '',
+    subtitles: '',
+    shortsOverride: null
   };
   channels.push(newChannel);
   await saveData();
@@ -491,11 +387,10 @@ async function addChannel(name) {
 async function removeChannel(channelId) {
     const channelToRemove = channels.find(c => c.id === channelId);
     if (!channelToRemove) return;
-    if (!confirm(`¿Estás seguro de que quieres eliminar el canal "${channelToRemove.name}"? Esta acción es permanente.`)) {
+    if (!confirm(`¿Estás seguro de que quieres eliminar el canal "${channelToRemove.name}"?`)) {
         return;
     }
     channels = channels.filter(c => c.id !== channelId);
-    // Además de borrar el canal de la lista, limpiamos sus datos del calendario
     if (userData.calendar) {
         for (const dateKey in userData.calendar) {
             if (userData.calendar[dateKey][channelToRemove.name]) {
@@ -549,25 +444,23 @@ function renderChannels() {
 
 async function updateShortsPerChannel() {
   if (!currentUser) return;
-  let value = parseInt(shortsPerChannelInput.value);
-  if (isNaN(value) || value < 1) {
-    value = 1;
-    shortsPerChannelInput.value = 1;
-  }
-  userData.shortsPerChannel = value;
-  await saveData();
+  // Esta función ahora solo actualiza la vista, ya que el valor se guarda con saveData() general
+  await saveData(); // Se debe guardar el cambio global
   renderCalendar();
+  calculateAndDisplayStreak();
 }
 
-// --- EDICIÓN DE CANAL (NUEVAS FUNCIONES) ---
+// --- EDICIÓN DE CANAL ---
 function openEditModal(channelId) {
   const channel = channels.find(c => c.id === channelId);
   if (channel) {
     editChannelIdInput.value = channel.id;
     editChannelNameInput.value = channel.name;
+    editChannelShortsOverrideInput.value = channel.shortsOverride || '';
     editChannelVoiceInput.value = channel.voice || '';
     editChannelMusicInput.value = channel.music || '';
     editChannelStyleInput.value = channel.style || '';
+    editChannelSubtitlesInput.value = channel.subtitles || '';
     editChannelModal.classList.remove('hide');
   }
 }
@@ -589,8 +482,11 @@ async function saveChannelEdit(event) {
     channels[channelIndex].voice = editChannelVoiceInput.value.trim();
     channels[channelIndex].music = editChannelMusicInput.value.trim();
     channels[channelIndex].style = editChannelStyleInput.value.trim();
+    channels[channelIndex].subtitles = editChannelSubtitlesInput.value.trim();
+    
+    const overrideValue = parseInt(editChannelShortsOverrideInput.value);
+    channels[channelIndex].shortsOverride = !isNaN(overrideValue) && overrideValue > 0 ? overrideValue : null;
 
-    // Si el nombre del canal cambió, debemos actualizarlo en el calendario
     if (oldName !== newName && userData.calendar) {
         for (const dateKey in userData.calendar) {
             if (userData.calendar[dateKey][oldName]) {
@@ -602,20 +498,19 @@ async function saveChannelEdit(event) {
 
     await saveData();
     renderChannels();
-    renderCalendar(); // Para reflejar cualquier cambio de nombre en el progreso
+    renderCalendar();
     closeEditModal();
   }
 }
 
-
-// --- CHECKLIST (ACTUALIZADO) ---
+// --- CHECKLIST ---
 function openChecklistModal(date) {
   if (!currentUser) return;
   clicked = date;
   checklistTitle.innerText = `Contenido para ${new Date(date + 'T00:00:00').toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`;
   checklistContainer.innerHTML = '';
 
-  const totalExpectedShorts = (channels.length || 0) * (userData?.shortsPerChannel || 0);
+  const totalExpectedShorts = channels.reduce((sum, channel) => sum + getShortsForChannel(channel), 0);
   let completedShortsToday = 0;
 
   if (channels.length === 0) {
@@ -632,38 +527,46 @@ function openChecklistModal(date) {
         <p><strong>Voz:</strong> ${channel.voice || 'No especificada'}</p>
         <p><strong>Música:</strong> ${channel.music || 'No especificada'}</p>
         <p><strong>Estilo:</strong> ${channel.style || 'No especificado'}</p>
+        <p><strong>Subtítulos:</strong> ${channel.subtitles || 'No especificados'}</p>
       `;
       channelDiv.appendChild(styleInfoDiv);
 
-      const numShorts = userData?.shortsPerChannel || 0;
+      const numShorts = getShortsForChannel(channel);
+      
       for (let i = 0; i < numShorts; i++) {
         const shortId = `short_${i}`;
         const currentStatus = userData?.calendar?.[date]?.[channel.name]?.[shortId] || 'pending';
         if (currentStatus === 'done') completedShortsToday++;
+        
         const row = document.createElement('div');
         row.classList.add('checklist-item');
         row.innerHTML = `
           <span class="item-label">Short ${i + 1}</span>
           <div class="status-buttons">
-            <button class="status-btn pending ${currentStatus === 'pending' ? 'active' : ''}" data-status="pending" title="No hecho">⏳</button>
-            <button class="status-btn inprogress ${currentStatus === 'in_progress' ? 'active' : ''}" data-status="in_progress" title="En proceso">🛠️</button>
-            <button class="status-btn done ${currentStatus === 'done' ? 'active' : ''}" data-status="done" title="Subido">✅</button>
+            <button class="status-btn pending ${currentStatus === 'pending' ? 'active' : ''}" data-status="pending" data-channel="${channel.name}" data-short="${shortId}">⏳</button>
+            <button class="status-btn inprogress ${currentStatus === 'in_progress' ? 'active' : ''}" data-status="in_progress" data-channel="${channel.name}" data-short="${shortId}">🛠️</button>
+            <button class="status-btn done ${currentStatus === 'done' ? 'active' : ''}" data-status="done" data-channel="${channel.name}" data-short="${shortId}">✅</button>
           </div>
         `;
-        row.querySelectorAll('.status-btn').forEach(button => {
-          button.addEventListener('click', async (e) => {
-            const newStatus = e.currentTarget.dataset.status;
-            await updateShortStatus(date, channel.name, shortId, newStatus);
-            openChecklistModal(date); // Recargamos el modal para actualizar contadores
-            renderCalendar();
-            calculateAndDisplayStreak();
-            checkAchievements();
-          });
-        });
         channelDiv.appendChild(row);
       }
       checklistContainer.appendChild(channelDiv);
     });
+
+    checklistContainer.addEventListener('click', async (e) => {
+        if (e.target.classList.contains('status-btn')) {
+            const button = e.target;
+            const newStatus = button.dataset.status;
+            const channelName = button.dataset.channel;
+            const shortId = button.dataset.short;
+            
+            await updateShortStatus(date, channelName, shortId, newStatus);
+            openChecklistModal(date);
+            renderCalendar();
+            calculateAndDisplayStreak();
+            checkAchievements();
+        }
+    }, { once: true });
   }
 
   updateDailyProgressBar(completedShortsToday, totalExpectedShorts);
@@ -683,15 +586,12 @@ function updateDailyProgressBar(completed, total) {
 
 async function updateShortStatus(date, channelName, shortId, status) {
   if (!currentUser) return;
-
   if (!userData.calendar) userData.calendar = {};
   if (!userData.calendar[date]) userData.calendar[date] = {};
   if (!userData.calendar[date][channelName]) userData.calendar[date][channelName] = {};
-
   userData.calendar[date][channelName][shortId] = status;
   await saveData();
 }
-
 
 // --- RACHA ---
 async function calculateAndDisplayStreak() {
@@ -704,23 +604,18 @@ async function calculateAndDisplayStreak() {
     let streakCount = 0;
     let checkDate = new Date(today);
 
-    // Bucle para contar la racha hacia atrás
     while (true) {
         const dateKey = checkDate.toISOString().split('T')[0];
-        const totalExpected = (channels.length || 0) * (userData.shortsPerChannel || 0);
+        const totalExpected = channels.reduce((sum, ch) => sum + getShortsForChannel(ch), 0);
         const completed = countDoneStatuses(userData.calendar?.[dateKey]);
         
         if (totalExpected > 0 && completed === totalExpected) {
             streakCount++;
-            checkDate.setDate(checkDate.getDate() - 1); // Retrocedemos un día
+            checkDate.setDate(checkDate.getDate() - 1);
         } else {
-            // Si el día de hoy no está completo, la racha de hoy es 0,
-            // pero la racha "guardada" podría ser de ayer.
-            // Si el día que falla no es hoy, rompemos.
             if (checkDate.getTime() !== today.getTime()) {
                 break;
             }
-            // Si es hoy el que falla, la racha es 0 y rompemos.
             streakCount = 0;
             break;
         }
@@ -823,7 +718,6 @@ function init() {
   });
 
   shortsPerChannelInput.addEventListener('change', updateShortsPerChannel);
-  shortsPerChannelInput.addEventListener('input', updateShortsPerChannel);
 
   settingsButton.addEventListener('click', () => {
     setupModal.classList.remove('hide');
@@ -846,7 +740,7 @@ function init() {
   });
   closeAchievementsButton.addEventListener('click', () => achievementsModal.classList.add('hide'));
 
-  // NUEVOS EVENTOS PARA EL MODAL DE EDICIÓN
+  // Eventos para el modal de edición
   editChannelForm.addEventListener('submit', saveChannelEdit);
   closeEditModalButton.addEventListener('click', closeEditModal);
 

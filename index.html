@@ -71,12 +71,12 @@
       <h3>Configuración General</h3>
 
       <div class="config-section">
-        <label for="shortsPerChannel">Shorts por día por canal</label>
+        <label for="shortsPerChannel">Shorts por día por canal (valor general)</label>
         <input type="number" id="shortsPerChannel" min="1" value="2" />
       </div>
 
       <div class="config-section">
-        <p>Añade o elimina tus canales de YouTube.</p>
+        <p>Añade, edita o elimina tus canales.</p>
         <form id="addChannelForm">
           <div class="form-group">
             <input type="text" id="newChannelName" placeholder="Nombre del nuevo canal" autocomplete="off" />
@@ -93,7 +93,7 @@
     <div class="modal-content">
       <h3>Tus Logros</h3>
       <div id="achievements-container">
-        <p class="no-achievements">Aún no tienes logros. ¡Sigue publicando videos!</p>
+        <p class="no-achievements">Aún no tienes logros. ¡Sigue publicando!</p>
       </div>
       <button id="closeAchievementsButton" class="action-button primary-button">Cerrar</button>
     </div>
@@ -109,6 +109,10 @@
           <input type="text" id="editChannelName" required>
         </div>
         <div class="config-section">
+          <label for="editChannelShortsOverride">Shorts por día (opcional)</label>
+          <input type="number" id="editChannelShortsOverride" min="1" placeholder="Dejar en blanco para usar el valor general">
+        </div>
+        <div class="config-section">
           <label for="editChannelVoice">Tipo de Voz</label>
           <input type="text" id="editChannelVoice" placeholder="Ej: Narrador profundo y serio">
         </div>
@@ -120,6 +124,12 @@
           <label for="editChannelStyle">Notas de Estilo de Imagen</label>
           <textarea id="editChannelStyle" rows="3" placeholder="Ej: Colores fríos, imágenes 'found footage'..."></textarea>
         </div>
+        
+        <div class="config-section">
+          <label for="editChannelSubtitles">Tipo de Subtítulos</label>
+          <input type="text" id="editChannelSubtitles" placeholder="Ej: Amarillos, fuente The Bold Font, borde negro">
+        </div>
+
         <div class="form-buttons">
           <button type="submit" class="action-button primary-button">Guardar Cambios</button>
           <button type="button" id="closeEditModalButton" class="action-button close-button">Cancelar</button>
@@ -127,6 +137,7 @@
       </form>
     </div>
   </div>
+
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
