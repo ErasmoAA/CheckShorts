@@ -888,3 +888,74 @@ body {
   color: var(--text-color-primary);
   text-align: right;
 }
+
+/* ========================================
+   NUEVOS ESTILOS VISUALES DE PROGRESO
+   ======================================== */
+
+/* --- Anillo de Progreso Diario (Donut) --- */
+
+/* Eliminamos la barra de progreso antigua */
+.day-progress-bar {
+    display: none;
+}
+
+.day {
+    position: relative;
+    background-clip: padding-box; /* Importante para el borde */
+}
+
+/* El círculo de progreso se crea con un gradiente cónico */
+.day.has-progress {
+    background-image: conic-gradient(var(--complete-color) var(--progress-percent, 0%), var(--secondary-bg-color) var(--progress-percent, 0%));
+}
+
+/* Creamos el "agujero" del donut para que el número sea legible */
+.day::before {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    right: 3px;
+    bottom: 3px;
+    background-color: var(--bg-color-secondary);
+    border-radius: 50%;
+    opacity: 0.8;
+}
+
+/* El número del día va por encima de todo */
+.day .day-number {
+    position: relative;
+    z-index: 1;
+}
+
+/* --- Barras de Progreso Semanales Detalladas --- */
+#weekdays div {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.weekday-progress {
+    width: 70%;
+    height: 5px;
+    background-color: rgba(0,0,0,0.1);
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.weekday-progress-fill {
+    width: 0%;
+    height: 100%;
+    background-color: var(--accent-color);
+    transition: width 0.5s ease;
+}
+
+/* --- Resaltado de la Semana Actual --- */
+.day.in-current-week {
+    background-color: rgba(255, 255, 255, 0.15);
+}
+.day.in-current-week::before {
+    background-color: var(--bg-color-primary); /* Hacemos el fondo del donut igual al fondo principal */
+}

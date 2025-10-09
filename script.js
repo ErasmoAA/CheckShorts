@@ -393,14 +393,25 @@ function renderCalendar() {
   monthDisplay.innerText = `${dt.toLocaleDateString('es-ES', { month: 'long' })} ${year}`;
   calendar.innerHTML = '';
 
+  // Resetear barras de progreso de la semana
+  for (let i = 0; i < 7; i++) {
+    const weekdayBarFill = document.querySelector(`#weekday-${i} .weekday-progress-fill`);
+    if (weekdayBarFill) weekdayBarFill.style.width = '0%';
+  }
+
   let totalVideosThisWeek = 0;
   let completedVideosThisWeek = 0;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const startOfWeek = new Date(today);
-  startOfWeek.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+  
+  const startOfWeek = new Date();
+  startOfWeek.setDate(startOfWeek.getDate() - ((startOfWeek.getDay() + 6) % 7));
+  startOfWeek.setHours(0,0,0,0);
+  
   const endOfWeek = new Date(startOfWeek);
-  endOfWeek.setDate(startOfWeek.getDate() + 7);
+  endOfWeek.setDate(startOfWeek.getDate() + 6);
+  endOfWeek.setHours(23,59,59,999);
+
 
   for (let i = 0; i < paddingDays; i++) {
     const paddingBox = document.createElement('div');
@@ -411,12 +422,22 @@ function renderCalendar() {
   for (let dayNumber = 1; dayNumber <= daysInMonth; dayNumber++) {
     const dayBox = document.createElement('div');
     dayBox.classList.add('day');
-    dayBox.innerText = dayNumber;
+    
+    // El número ahora va dentro de un span para controlarlo mejor con Z-index
+    dayBox.innerHTML = `<span class="day-number">${dayNumber}</span>`;
+
     const currentDay = new Date(year, month, dayNumber);
     currentDay.setHours(0, 0, 0, 0);
+
     if (currentDay.getTime() === today.getTime()) {
       dayBox.classList.add('current-day');
     }
+
+    // Resaltar días de la semana actual
+    if (currentDay >= startOfWeek && currentDay <= endOfWeek) {
+        dayBox.classList.add('in-current-week');
+    }
+
     const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNumber).padStart(2, '0')}`;
     const dayData = userData?.calendar?.[dateKey];
     
@@ -428,18 +449,28 @@ function renderCalendar() {
     }
     
     const completedForDay = countDoneStatuses(dayData);
-    const inProgressToday = hasInProgress(dayData);
 
     if (totalForDay > 0) {
       const progressPercentage = (completedForDay / totalForDay) * 100;
-      const progressBar = document.createElement('div');
-      progressBar.classList.add('day-progress-bar');
-      progressBar.style.width = `${progressPercentage}%`;
-      dayBox.appendChild(progressBar);
+      
+      // Lógica para el anillo de progreso
+      dayBox.classList.add('has-progress');
+      dayBox.style.setProperty('--progress-percent', `${progressPercentage}%`);
+
       if (progressPercentage === 100) dayBox.classList.add('completed-day');
-      else if (completedForDay > 0 || inProgressToday) dayBox.classList.add('partial-day');
+      else if (completedForDay > 0) dayBox.classList.add('partial-day');
       else dayBox.classList.add('pending-day');
+
+      // Lógica para las barras de la semana actual
+      if (currentDay >= startOfWeek && currentDay <= endOfWeek) {
+        const dayOfWeek = (currentDay.getDay() + 6) % 7;
+        const weekdayBarFill = document.querySelector(`#weekday-${dayOfWeek} .weekday-progress-fill`);
+        if (weekdayBarFill) {
+            weekdayBarFill.style.width = `${progressPercentage}%`;
+        }
+      }
     }
+    
     dayBox.addEventListener('click', () => openChecklistModal(dateKey));
 
     if (currentUser && currentDay >= startOfWeek && currentDay < endOfWeek) {
