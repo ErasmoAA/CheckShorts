@@ -874,6 +874,8 @@ function init() {
   subscriberForm.addEventListener('submit', saveSubscriberCounts);
   closeAnalyticsButton.addEventListener('click', () => analyticsModal.classList.add('hide'));
 
+  dailyLogButton.addEventListener('click', openSubscriberModal);
+
   shortsPerChannelInput.addEventListener('change', updateShortsPerChannel);
 
   settingsButton.addEventListener('click', () => {
