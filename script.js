@@ -6,9 +6,11 @@
 // --- VARIABLES GLOBALES Y SELECTORES ---
 let nav = 0;
 let clicked = null;
-let channels = []; // Ahora será un array de objetos: [{id, name, voice, music, style, subtitles, shortsOverride}]
+let channels = [];
 let currentUser = null;
 let userData = null;
+let hasShownSubscriberModalToday = false; // Flag para mostrar el modal solo una vez
+let subscriberChartInstance = null; // Variable para guardar la instancia del gráfico
 
 const calendar = document.getElementById('calendar');
 const monthDisplay = document.getElementById('monthDisplay');
@@ -39,6 +41,14 @@ const closeSetupButton = document.getElementById('closeSetupButton');
 const closeChecklistButton = document.getElementById('closeChecklistButton');
 const closeAchievementsButton = document.getElementById('closeAchievementsButton');
 
+const analyticsButton = document.getElementById('analyticsButton');
+const subscriberModal = document.getElementById('subscriberModal');
+const subscriberForm = document.getElementById('subscriberForm');
+const subscriberList = document.getElementById('subscriber-list');
+const subscriberTitle = document.getElementById('subscriberTitle');
+const analyticsModal = document.getElementById('analyticsModal');
+const closeAnalyticsButton = document.getElementById('closeAnalyticsButton');
+
 // SELECTORES PARA EL MODAL DE EDICIÓN
 const editChannelModal = document.getElementById('editChannelModal');
 const editChannelForm = document.getElementById('editChannelForm');
@@ -53,6 +63,115 @@ const closeEditModalButton = document.getElementById('closeEditModalButton');
 
 
 // --- HELPERS DE CONTEO Y UTILIDAD ---
+function getTodayDateString() {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function openSubscriberModal() {
+    const todayKey = getTodayDateString();
+    subscriberTitle.innerText = `Registrar Suscriptores del ${todayKey}`;
+    subscriberList.innerHTML = ''; // Limpiar la lista
+
+    if (channels.length === 0) {
+        subscriberList.innerHTML = '<p>Añade un canal en Configuración para empezar a registrar suscriptores.</p>';
+    } else {
+        channels.forEach(channel => {
+            const currentValue = userData.subscriberHistory?.[todayKey]?.[channel.id] || '';
+            const item = document.createElement('div');
+            item.className = 'subscriber-item';
+            item.innerHTML = `
+                <label for="subscribers-${channel.id}">${channel.name}</label>
+                <input type="number" id="subscribers-${channel.id}" data-channel-id="${channel.id}" value="${currentValue}" placeholder="0">
+            `;
+            subscriberList.appendChild(item);
+        });
+    }
+    subscriberModal.classList.remove('hide');
+}
+
+async function saveSubscriberCounts(event) {
+    event.preventDefault();
+    const todayKey = getTodayDateString();
+
+    if (!userData.subscriberHistory) {
+        userData.subscriberHistory = {};
+    }
+    if (!userData.subscriberHistory[todayKey]) {
+        userData.subscriberHistory[todayKey] = {};
+    }
+
+    const inputs = subscriberList.querySelectorAll('input[type="number"]');
+    inputs.forEach(input => {
+        const channelId = input.dataset.channelId;
+        const count = parseInt(input.value);
+        if (channelId && !isNaN(count)) {
+            userData.subscriberHistory[todayKey][channelId] = count;
+        }
+    });
+
+    await saveData();
+    subscriberModal.classList.add('hide');
+    hasShownSubscriberModalToday = true; // Marcamos que ya se mostró hoy
+}
+
+function openAnalyticsModal() {
+    renderSubscriberChart();
+    analyticsModal.classList.remove('hide');
+}
+
+function renderSubscriberChart() {
+    const ctx = document.getElementById('subscriberChart').getContext('2d');
+    
+    if (subscriberChartInstance) {
+        subscriberChartInstance.destroy(); // Destruir gráfico anterior para re-dibujar
+    }
+
+    const history = userData.subscriberHistory || {};
+    const dates = Object.keys(history).sort();
+
+    const datasets = channels.map(channel => {
+        const data = dates.map(date => history[date]?.[channel.id] || null);
+        const randomColor = `hsl(${Math.random() * 360}, 70%, 50%)`;
+        return {
+            label: channel.name,
+            data: data,
+            borderColor: randomColor,
+            backgroundColor: randomColor + '33', // Color con transparencia
+            tension: 0.1,
+            spanGaps: true, // Conecta puntos aunque falten datos
+        };
+    });
+
+    subscriberChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: dates,
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            },
+            plugins: {
+                legend: {
+                    position: 'top',
+                },
+                title: {
+                    display: true,
+                    text: 'Evolución por Canal'
+                }
+            }
+        }
+    });
+}
+
 function countDoneStatuses(dayData) {
   if (!dayData || typeof dayData !== 'object') return 0;
   let total = 0;
@@ -214,6 +333,10 @@ async function handleAuthStatus(user) {
     renderCalendar();
     renderChannels();
     calculateAndDisplayStreak();
+    const todayKey = getTodayDateString();
+    if (!hasShownSubscriberModalToday && !userData.subscriberHistory?.[todayKey]) {
+        openSubscriberModal();
+    }
   } else {
     userStatusDisplay.innerText = 'No hay sesión iniciada.';
     googleSignInButton.classList.remove('hide');
@@ -234,6 +357,9 @@ async function loadData(uid) {
     const doc = await docRef.get();
     if (doc.exists) {
       userData = doc.data();
+      if (!userData.subscriberHistory) { // Inicializar si no existe
+            userData.subscriberHistory = {};
+        }
       
       let needsSave = false;
       // Migración automática: si los canales son strings, los convierte a objetos completos.
@@ -254,7 +380,8 @@ async function loadData(uid) {
       userData = {
         channels: [], shortsPerChannel: 2, calendar: {},
         lastLoginDate: new Date().toISOString().split('T')[0],
-        streak: 0, achievements: []
+        streak: 0, achievements: [],
+        subscriberHistory: {}
       };
       channels = [];
       await saveData();
@@ -319,7 +446,14 @@ function renderCalendar() {
     const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNumber).padStart(2, '0')}`;
     const dayData = userData?.calendar?.[dateKey];
     
-    const totalForDay = channels.reduce((sum, channel) => sum + getShortsForChannel(channel), 0);
+    let totalForDay;
+    if (dayData && dayData.dailyGoal) {
+      // Si el día tiene una meta guardada, la usamos.
+      totalForDay = dayData.dailyGoal;
+    } else {
+      // Si no (para hoy o días futuros), la calculamos con la configuración actual.
+      totalForDay = channels.reduce((sum, channel) => sum + getShortsForChannel(channel), 0);
+    }
     
     const completedForDay = countDoneStatuses(dayData);
     const inProgressToday = hasInProgress(dayData);
@@ -586,9 +720,20 @@ function updateDailyProgressBar(completed, total) {
 
 async function updateShortStatus(date, channelName, shortId, status) {
   if (!currentUser) return;
+
   if (!userData.calendar) userData.calendar = {};
   if (!userData.calendar[date]) userData.calendar[date] = {};
   if (!userData.calendar[date][channelName]) userData.calendar[date][channelName] = {};
+
+  // ✅ AÑADE ESTE BLOQUE DE CÓDIGO AQUÍ
+  // Si es la primera vez que se interactúa con este día,
+  // calculamos y guardamos la meta total de ese momento.
+  if (!userData.calendar[date].dailyGoal) {
+    const totalExpectedOnThisDay = channels.reduce((sum, ch) => sum + getShortsForChannel(ch), 0);
+    userData.calendar[date].dailyGoal = totalExpectedOnThisDay;
+  }
+  // ✅ FIN DEL BLOQUE A AÑADIR
+
   userData.calendar[date][channelName][shortId] = status;
   await saveData();
 }
@@ -606,7 +751,15 @@ async function calculateAndDisplayStreak() {
 
     while (true) {
         const dateKey = checkDate.toISOString().split('T')[0];
-        const totalExpected = channels.reduce((sum, ch) => sum + getShortsForChannel(ch), 0);
+        let totalExpected;
+        const dayDataForStreak = userData.calendar?.[dateKey];
+        if (dayDataForStreak && dayDataForStreak.dailyGoal) {
+          // Usamos la meta guardada para el día que estamos revisando.
+          totalExpected = dayDataForStreak.dailyGoal;
+        } else {
+          // Si es un día sin datos, calculamos la meta con la configuración actual.
+          totalExpected = channels.reduce((sum, ch) => sum + getShortsForChannel(ch), 0);
+        }
         const completed = countDoneStatuses(userData.calendar?.[dateKey]);
         
         if (totalExpected > 0 && completed === totalExpected) {
@@ -716,6 +869,10 @@ function init() {
       newChannelNameInput.value = '';
     }
   });
+
+  analyticsButton.addEventListener('click', openAnalyticsModal);
+  subscriberForm.addEventListener('submit', saveSubscriberCounts);
+  closeAnalyticsButton.addEventListener('click', () => analyticsModal.classList.add('hide'));
 
   shortsPerChannelInput.addEventListener('change', updateShortsPerChannel);
 

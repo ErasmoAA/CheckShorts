@@ -11,6 +11,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext x='50%25' y='50%25' font-size='80' text-anchor='middle' dominant-baseline='central'%3E🗓️%3C/text%3E%3C/svg%3E" />
   <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext x='50%25' y='50%25' font-size='80' text-anchor='middle' dominant-baseline='central'%3E🗓️%3C/text%3E%3C/svg%3E" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -39,6 +41,8 @@
       </div>
 
       <button id="settingsButton" class="settings-btn">⚙️ Configuración</button>
+      <button id="analyticsButton" class="settings-btn">📈 Analíticas</button>
+      <button id="dailyLogButton" class="settings-btn">✍️ Registrar Datos</button>
       <button id="achievementsButton" class="settings-btn">🏆 Logros</button>
 
       <div id="authContainer">
@@ -124,17 +128,38 @@
           <label for="editChannelStyle">Notas de Estilo de Imagen</label>
           <textarea id="editChannelStyle" rows="3" placeholder="Ej: Colores fríos, imágenes 'found footage'..."></textarea>
         </div>
-        
         <div class="config-section">
           <label for="editChannelSubtitles">Tipo de Subtítulos</label>
           <input type="text" id="editChannelSubtitles" placeholder="Ej: Amarillos, fuente The Bold Font, borde negro">
         </div>
-
         <div class="form-buttons">
           <button type="submit" class="action-button primary-button">Guardar Cambios</button>
           <button type="button" id="closeEditModalButton" class="action-button close-button">Cancelar</button>
         </div>
       </form>
+    </div>
+  </div>
+  
+  <div id="subscriberModal" class="modal-backdrop hide">
+    <div class="modal-content">
+      <h3 id="subscriberTitle">Registrar Suscriptores de Hoy</h3>
+      <form id="subscriberForm">
+        <div id="subscriber-list" class="config-section">
+          </div>
+        <div class="form-buttons">
+          <button type="submit" class="action-button primary-button">Guardar Recuento</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="analyticsModal" class="modal-backdrop hide">
+    <div class="modal-content" style="max-width: 800px;">
+      <h3>Crecimiento de Suscriptores</h3>
+      <div id="analytics-container">
+        <canvas id="subscriberChart"></canvas>
+      </div>
+      <button id="closeAnalyticsButton" class="action-button close-button">Cerrar</button>
     </div>
   </div>
 

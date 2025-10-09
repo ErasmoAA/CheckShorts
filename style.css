@@ -866,3 +866,25 @@ body {
         font-size: 1em;
     }
 }
+
+/* --- Estilos para Analíticas y Suscriptores --- */
+.subscriber-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+.subscriber-item label {
+  flex-grow: 1;
+  margin: 0;
+  font-weight: 500;
+}
+.subscriber-item input {
+  width: 100px;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--text-color-primary);
+  text-align: right;
+}
