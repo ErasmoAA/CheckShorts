@@ -1,6 +1,6 @@
 // ======================================================
-// scripts.js - VERSIÓN FINAL Y COMPLETA
-// Incluye Logros, Mantenimiento y todas las funciones de edición.
+// scripts.js - VERSIÓN FINAL CORREGIDA
+// Soluciona el error de actualización de estado en múltiples días.
 // ======================================================
 
 // --- VARIABLES GLOBALES Y SELECTORES ---
@@ -9,47 +9,40 @@ let clicked = null;
 let channels = [];
 let currentUser = null;
 let userData = null;
-let hasShownSubscriberModalToday = false; // Flag para mostrar el modal solo una vez
-let subscriberChartInstance = null; // Variable para guardar la instancia del gráfico
+let subscriberChartInstance = null;
 
 const calendar = document.getElementById('calendar');
 const monthDisplay = document.getElementById('monthDisplay');
 const setupModal = document.getElementById('setupModal');
 const checklistModal = document.getElementById('checklistModal');
 const achievementsModal = document.getElementById('achievementsModal');
-
 const addChannelForm = document.getElementById('addChannelForm');
 const newChannelNameInput = document.getElementById('newChannelName');
 const channelList = document.getElementById('channelList');
 const shortsPerChannelInput = document.getElementById('shortsPerChannel');
 const checklistContainer = document.getElementById('checklist-container');
 const checklistTitle = document.getElementById('checklistTitle');
-
 const googleSignInButton = document.getElementById('googleSignInButton');
 const signOutButton = document.getElementById('signOutButton');
 const userStatusDisplay = document.getElementById('userStatus');
-
 const currentStreakDisplay = document.getElementById('currentStreak');
 const dailyProgressBarFill = document.querySelector('#dailyProgressBar .progress-bar-fill');
 const dailyProgressText = document.getElementById('dailyProgressText');
 const weeklyProgressBarFill = document.querySelector('#weeklyProgressBar .progress-bar-fill');
 const weeklyProgressText = document.getElementById('weeklyProgressText');
-
 const settingsButton = document.getElementById('settingsButton');
 const achievementsButton = document.getElementById('achievementsButton');
 const closeSetupButton = document.getElementById('closeSetupButton');
 const closeChecklistButton = document.getElementById('closeChecklistButton');
 const closeAchievementsButton = document.getElementById('closeAchievementsButton');
-
 const analyticsButton = document.getElementById('analyticsButton');
+const dailyLogButton = document.getElementById('dailyLogButton');
 const subscriberModal = document.getElementById('subscriberModal');
 const subscriberForm = document.getElementById('subscriberForm');
 const subscriberList = document.getElementById('subscriber-list');
 const subscriberTitle = document.getElementById('subscriberTitle');
 const analyticsModal = document.getElementById('analyticsModal');
 const closeAnalyticsButton = document.getElementById('closeAnalyticsButton');
-
-// SELECTORES PARA EL MODAL DE EDICIÓN
 const editChannelModal = document.getElementById('editChannelModal');
 const editChannelForm = document.getElementById('editChannelForm');
 const editChannelIdInput = document.getElementById('editChannelId');
@@ -63,119 +56,10 @@ const closeEditModalButton = document.getElementById('closeEditModalButton');
 
 
 // --- HELPERS DE CONTEO Y UTILIDAD ---
-function getTodayDateString() {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-}
-
-function openSubscriberModal() {
-    const todayKey = getTodayDateString();
-    subscriberTitle.innerText = `Registrar Suscriptores del ${todayKey}`;
-    subscriberList.innerHTML = ''; // Limpiar la lista
-
-    if (channels.length === 0) {
-        subscriberList.innerHTML = '<p>Añade un canal en Configuración para empezar a registrar suscriptores.</p>';
-    } else {
-        channels.forEach(channel => {
-            const currentValue = userData.subscriberHistory?.[todayKey]?.[channel.id] || '';
-            const item = document.createElement('div');
-            item.className = 'subscriber-item';
-            item.innerHTML = `
-                <label for="subscribers-${channel.id}">${channel.name}</label>
-                <input type="number" id="subscribers-${channel.id}" data-channel-id="${channel.id}" value="${currentValue}" placeholder="0">
-            `;
-            subscriberList.appendChild(item);
-        });
-    }
-    subscriberModal.classList.remove('hide');
-}
-
-async function saveSubscriberCounts(event) {
-    event.preventDefault();
-    const todayKey = getTodayDateString();
-
-    if (!userData.subscriberHistory) {
-        userData.subscriberHistory = {};
-    }
-    if (!userData.subscriberHistory[todayKey]) {
-        userData.subscriberHistory[todayKey] = {};
-    }
-
-    const inputs = subscriberList.querySelectorAll('input[type="number"]');
-    inputs.forEach(input => {
-        const channelId = input.dataset.channelId;
-        const count = parseInt(input.value);
-        if (channelId && !isNaN(count)) {
-            userData.subscriberHistory[todayKey][channelId] = count;
-        }
-    });
-
-    await saveData();
-    subscriberModal.classList.add('hide');
-    hasShownSubscriberModalToday = true; // Marcamos que ya se mostró hoy
-}
-
-function openAnalyticsModal() {
-    renderSubscriberChart();
-    analyticsModal.classList.remove('hide');
-}
-
-function renderSubscriberChart() {
-    const ctx = document.getElementById('subscriberChart').getContext('2d');
-    
-    if (subscriberChartInstance) {
-        subscriberChartInstance.destroy(); // Destruir gráfico anterior para re-dibujar
-    }
-
-    const history = userData.subscriberHistory || {};
-    const dates = Object.keys(history).sort();
-
-    const datasets = channels.map(channel => {
-        const data = dates.map(date => history[date]?.[channel.id] || null);
-        const randomColor = `hsl(${Math.random() * 360}, 70%, 50%)`;
-        return {
-            label: channel.name,
-            data: data,
-            borderColor: randomColor,
-            backgroundColor: randomColor + '33', // Color con transparencia
-            tension: 0.1,
-            spanGaps: true, // Conecta puntos aunque falten datos
-        };
-    });
-
-    subscriberChartInstance = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: dates,
-            datasets: datasets
-        },
-        options: {
-            responsive: true,
-            scales: {
-                y: {
-                    beginAtZero: true
-                }
-            },
-            plugins: {
-                legend: {
-                    position: 'top',
-                },
-                title: {
-                    display: true,
-                    text: 'Evolución por Canal'
-                }
-            }
-        }
-    });
-}
-
 function countDoneStatuses(dayData) {
-  if (!dayData || typeof dayData !== 'object') return 0;
+  if (!dayData || typeof dayData !== 'object' || !dayData.channels) return 0;
   let total = 0;
-  for (const channelMap of Object.values(dayData)) {
+  for (const channelMap of Object.values(dayData.channels)) {
     if (channelMap && typeof channelMap === 'object') {
       for (const status of Object.values(channelMap)) {
         if (status === 'done') total++;
@@ -186,8 +70,8 @@ function countDoneStatuses(dayData) {
 }
 
 function hasInProgress(dayData) {
-  if (!dayData || typeof dayData !== 'object') return false;
-  for (const channelMap of Object.values(dayData)) {
+  if (!dayData || typeof dayData !== 'object' || !dayData.channels) return false;
+  for (const channelMap of Object.values(dayData.channels)) {
     if (channelMap && typeof channelMap === 'object') {
       for (const status of Object.values(channelMap)) {
         if (status === 'in_progress') return true;
@@ -214,35 +98,122 @@ function getOrphanChannelNames() {
     const inCalendar = new Set();
     for (const dateKey of Object.keys(userData.calendar)) {
         const day = userData.calendar[dateKey];
-        if (day && typeof day === 'object') {
-            for (const ch of Object.keys(day)) { inCalendar.add(ch); }
+        if (day && day.channels && typeof day.channels === 'object') {
+            for (const ch of Object.keys(day.channels)) { inCalendar.add(ch); }
         }
     }
     const inChannels = new Set((channels || []).map(c => c.name));
     return [...inCalendar].filter(name => !inChannels.has(name));
 }
 
-// --- FUNCIONES DE MANTENIMIENTO Y REPARACIÓN ---
+// --- LÓGICA DE SUSCRIPTORES Y ANALÍTICAS ---
+function getTodayDateString() {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+}
 
+function openSubscriberModal() {
+    const todayKey = getTodayDateString();
+    subscriberTitle.innerText = `Registrar Suscriptores del ${todayKey}`;
+    subscriberList.innerHTML = '';
+
+    if (channels.length === 0) {
+        subscriberList.innerHTML = '<p>Añade un canal en Configuración para empezar.</p>';
+    } else {
+        channels.forEach(channel => {
+            const currentValue = userData.subscriberHistory?.[todayKey]?.[channel.id] || '';
+            const item = document.createElement('div');
+            item.className = 'subscriber-item';
+            item.innerHTML = `
+                <label for="subscribers-${channel.id}">${channel.name}</label>
+                <input type="number" id="subscribers-${channel.id}" data-channel-id="${channel.id}" value="${currentValue}" placeholder="0">
+            `;
+            subscriberList.appendChild(item);
+        });
+    }
+    subscriberModal.classList.remove('hide');
+}
+
+async function saveSubscriberCounts(event) {
+    event.preventDefault();
+    const todayKey = getTodayDateString();
+
+    if (!userData.subscriberHistory) userData.subscriberHistory = {};
+    if (!userData.subscriberHistory[todayKey]) userData.subscriberHistory[todayKey] = {};
+
+    const inputs = subscriberList.querySelectorAll('input[type="number"]');
+    inputs.forEach(input => {
+        const channelId = input.dataset.channelId;
+        const count = parseInt(input.value);
+        if (channelId && !isNaN(count) && count >= 0) {
+            userData.subscriberHistory[todayKey][channelId] = count;
+        }
+    });
+
+    await saveData();
+    subscriberModal.classList.add('hide');
+}
+
+function openAnalyticsModal() {
+    analyticsModal.classList.remove('hide');
+    renderSubscriberChart();
+}
+
+function renderSubscriberChart() {
+    const ctx = document.getElementById('subscriberChart').getContext('2d');
+    
+    if (subscriberChartInstance) {
+        subscriberChartInstance.destroy();
+    }
+
+    const history = userData.subscriberHistory || {};
+    const dates = Object.keys(history).sort();
+
+    if (dates.length === 0) return;
+
+    const datasets = channels.map(channel => {
+        const data = dates.map(date => history[date]?.[channel.id] ?? null);
+        const randomColor = `hsl(${Math.random() * 360}, 70%, 50%)`;
+        return {
+            label: channel.name,
+            data: data,
+            borderColor: randomColor,
+            backgroundColor: randomColor + '33',
+            tension: 0.1,
+            spanGaps: true,
+        };
+    });
+
+    subscriberChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: { labels: dates, datasets: datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: { y: { beginAtZero: false } },
+            plugins: {
+                legend: { position: 'top' },
+                title: { display: true, text: 'Evolución por Canal' }
+            }
+        }
+    });
+}
+
+// --- FUNCIONES DE MANTENIMIENTO Y REPARACIÓN ---
 async function purgeOrphanChannelsFromCalendar() {
   if (!userData?.calendar) return;
-
   const keepNames = new Set((channels || []).map(c => c.name));
   let changed = false;
   const deletedOrphans = [];
 
   for (const dateKey of Object.keys(userData.calendar)) {
     const day = userData.calendar[dateKey];
-    if (!day || typeof day !== 'object') continue;
+    if (!day || !day.channels || typeof day.channels !== 'object') continue;
 
-    if ('undefined' in day) {
-      delete day['undefined'];
-      changed = true;
-    }
-    for (const key of Object.keys(day)) {
+    for (const key of Object.keys(day.channels)) {
       if (!keepNames.has(key)) {
         deletedOrphans.push(key);
-        delete day[key];
+        delete day.channels[key];
         changed = true;
       }
     }
@@ -252,13 +223,8 @@ async function purgeOrphanChannelsFromCalendar() {
     await saveData();
     renderCalendar();
     updateSettingsExtras();
-
     const uniqueDeleted = [...new Set(deletedOrphans)];
-    if (uniqueDeleted.length > 0) {
-      alert(`Limpieza completada.\nCanales eliminados del calendario: ${uniqueDeleted.join(', ')}`);
-    } else {
-      alert('Limpieza completada. No se encontraron nuevos datos para eliminar.');
-    }
+    alert(`Limpieza completada.\nCanales eliminados: ${uniqueDeleted.join(', ')}`);
   } else {
     alert('No se encontraron canales huérfanos para eliminar.');
   }
@@ -333,8 +299,9 @@ async function handleAuthStatus(user) {
     renderCalendar();
     renderChannels();
     calculateAndDisplayStreak();
+    
     const todayKey = getTodayDateString();
-    if (!hasShownSubscriberModalToday && !userData.subscriberHistory?.[todayKey]) {
+    if (!userData.subscriberHistory?.[todayKey]) {
         openSubscriberModal();
     }
   } else {
@@ -357,18 +324,26 @@ async function loadData(uid) {
     const doc = await docRef.get();
     if (doc.exists) {
       userData = doc.data();
-      if (!userData.subscriberHistory) { // Inicializar si no existe
-            userData.subscriberHistory = {};
-        }
       
       let needsSave = false;
-      // Migración automática: si los canales son strings, los convierte a objetos completos.
       if (userData.channels && userData.channels.length > 0 && typeof userData.channels[0] === 'string') {
-        console.log("Migrando estructura de canales de strings a objetos...");
         userData.channels = userData.channels.map(name => ({
           id: genId(), name, voice: '', music: '', style: '', subtitles: '', shortsOverride: null
         }));
         needsSave = true;
+      }
+      if(userData.calendar){
+          for(const dateKey in userData.calendar){
+              if(userData.calendar[dateKey] && !userData.calendar[dateKey].hasOwnProperty('channels')){
+                  const oldDayData = {...userData.calendar[dateKey]};
+                  userData.calendar[dateKey] = { channels: oldDayData, dailyGoal: null };
+                  needsSave = true;
+              }
+          }
+      }
+      if (!userData.subscriberHistory) {
+          userData.subscriberHistory = {};
+          needsSave = true;
       }
 
       channels = userData.channels || [];
@@ -380,8 +355,7 @@ async function loadData(uid) {
       userData = {
         channels: [], shortsPerChannel: 2, calendar: {},
         lastLoginDate: new Date().toISOString().split('T')[0],
-        streak: 0, achievements: [],
-        subscriberHistory: {}
+        streak: 0, achievements: [], subscriberHistory: {}
       };
       channels = [];
       await saveData();
@@ -448,10 +422,8 @@ function renderCalendar() {
     
     let totalForDay;
     if (dayData && dayData.dailyGoal) {
-      // Si el día tiene una meta guardada, la usamos.
       totalForDay = dayData.dailyGoal;
     } else {
-      // Si no (para hoy o días futuros), la calculamos con la configuración actual.
       totalForDay = channels.reduce((sum, channel) => sum + getShortsForChannel(channel), 0);
     }
     
@@ -503,13 +475,7 @@ async function addChannel(name) {
     return;
   }
   const newChannel = {
-    id: genId(),
-    name: name,
-    voice: '',
-    music: '',
-    style: '',
-    subtitles: '',
-    shortsOverride: null
+    id: genId(), name, voice: '', music: '', style: '', subtitles: '', shortsOverride: null
   };
   channels.push(newChannel);
   await saveData();
@@ -527,8 +493,8 @@ async function removeChannel(channelId) {
     channels = channels.filter(c => c.id !== channelId);
     if (userData.calendar) {
         for (const dateKey in userData.calendar) {
-            if (userData.calendar[dateKey][channelToRemove.name]) {
-                delete userData.calendar[dateKey][channelToRemove.name];
+            if (userData.calendar[dateKey].channels && userData.calendar[dateKey].channels[channelToRemove.name]) {
+                delete userData.calendar[dateKey].channels[channelToRemove.name];
             }
         }
     }
@@ -578,8 +544,7 @@ function renderChannels() {
 
 async function updateShortsPerChannel() {
   if (!currentUser) return;
-  // Esta función ahora solo actualiza la vista, ya que el valor se guarda con saveData() general
-  await saveData(); // Se debe guardar el cambio global
+  await saveData();
   renderCalendar();
   calculateAndDisplayStreak();
 }
@@ -623,9 +588,9 @@ async function saveChannelEdit(event) {
 
     if (oldName !== newName && userData.calendar) {
         for (const dateKey in userData.calendar) {
-            if (userData.calendar[dateKey][oldName]) {
-                userData.calendar[dateKey][newName] = userData.calendar[dateKey][oldName];
-                delete userData.calendar[dateKey][oldName];
+            if (userData.calendar[dateKey].channels && userData.calendar[dateKey].channels[oldName]) {
+                userData.calendar[dateKey].channels[newName] = userData.calendar[dateKey].channels[oldName];
+                delete userData.calendar[dateKey].channels[oldName];
             }
         }
     }
@@ -669,7 +634,7 @@ function openChecklistModal(date) {
       
       for (let i = 0; i < numShorts; i++) {
         const shortId = `short_${i}`;
-        const currentStatus = userData?.calendar?.[date]?.[channel.name]?.[shortId] || 'pending';
+        const currentStatus = userData?.calendar?.[date]?.channels?.[channel.name]?.[shortId] || 'pending';
         if (currentStatus === 'done') completedShortsToday++;
         
         const row = document.createElement('div');
@@ -677,30 +642,15 @@ function openChecklistModal(date) {
         row.innerHTML = `
           <span class="item-label">Short ${i + 1}</span>
           <div class="status-buttons">
-            <button class="status-btn pending ${currentStatus === 'pending' ? 'active' : ''}" data-status="pending" data-channel="${channel.name}" data-short="${shortId}">⏳</button>
-            <button class="status-btn inprogress ${currentStatus === 'in_progress' ? 'active' : ''}" data-status="in_progress" data-channel="${channel.name}" data-short="${shortId}">🛠️</button>
-            <button class="status-btn done ${currentStatus === 'done' ? 'active' : ''}" data-status="done" data-channel="${channel.name}" data-short="${shortId}">✅</button>
+            <button class="status-btn pending ${currentStatus === 'pending' ? 'active' : ''}" data-status="pending" data-channel="${channel.name}" data-short="${shortId}" data-date="${date}">⏳</button>
+            <button class="status-btn inprogress ${currentStatus === 'in_progress' ? 'active' : ''}" data-status="in_progress" data-channel="${channel.name}" data-short="${shortId}" data-date="${date}">🛠️</button>
+            <button class="status-btn done ${currentStatus === 'done' ? 'active' : ''}" data-status="done" data-channel="${channel.name}" data-short="${shortId}" data-date="${date}">✅</button>
           </div>
         `;
         channelDiv.appendChild(row);
       }
       checklistContainer.appendChild(channelDiv);
     });
-
-    checklistContainer.addEventListener('click', async (e) => {
-        if (e.target.classList.contains('status-btn')) {
-            const button = e.target;
-            const newStatus = button.dataset.status;
-            const channelName = button.dataset.channel;
-            const shortId = button.dataset.short;
-            
-            await updateShortStatus(date, channelName, shortId, newStatus);
-            openChecklistModal(date);
-            renderCalendar();
-            calculateAndDisplayStreak();
-            checkAchievements();
-        }
-    }, { once: true });
   }
 
   updateDailyProgressBar(completedShortsToday, totalExpectedShorts);
@@ -720,21 +670,17 @@ function updateDailyProgressBar(completed, total) {
 
 async function updateShortStatus(date, channelName, shortId, status) {
   if (!currentUser) return;
-
   if (!userData.calendar) userData.calendar = {};
-  if (!userData.calendar[date]) userData.calendar[date] = {};
-  if (!userData.calendar[date][channelName]) userData.calendar[date][channelName] = {};
+  if (!userData.calendar[date]) userData.calendar[date] = { channels: {}, dailyGoal: null };
+  if (!userData.calendar[date].channels) userData.calendar[date].channels = {};
+  if (!userData.calendar[date].channels[channelName]) userData.calendar[date].channels[channelName] = {};
 
-  // ✅ AÑADE ESTE BLOQUE DE CÓDIGO AQUÍ
-  // Si es la primera vez que se interactúa con este día,
-  // calculamos y guardamos la meta total de ese momento.
   if (!userData.calendar[date].dailyGoal) {
     const totalExpectedOnThisDay = channels.reduce((sum, ch) => sum + getShortsForChannel(ch), 0);
     userData.calendar[date].dailyGoal = totalExpectedOnThisDay;
   }
-  // ✅ FIN DEL BLOQUE A AÑADIR
 
-  userData.calendar[date][channelName][shortId] = status;
+  userData.calendar[date].channels[channelName][shortId] = status;
   await saveData();
 }
 
@@ -751,16 +697,16 @@ async function calculateAndDisplayStreak() {
 
     while (true) {
         const dateKey = checkDate.toISOString().split('T')[0];
+        
         let totalExpected;
         const dayDataForStreak = userData.calendar?.[dateKey];
         if (dayDataForStreak && dayDataForStreak.dailyGoal) {
-          // Usamos la meta guardada para el día que estamos revisando.
           totalExpected = dayDataForStreak.dailyGoal;
         } else {
-          // Si es un día sin datos, calculamos la meta con la configuración actual.
           totalExpected = channels.reduce((sum, ch) => sum + getShortsForChannel(ch), 0);
         }
-        const completed = countDoneStatuses(userData.calendar?.[dateKey]);
+
+        const completed = countDoneStatuses(dayDataForStreak);
         
         if (totalExpected > 0 && completed === totalExpected) {
             streakCount++;
@@ -786,8 +732,8 @@ async function calculateAndDisplayStreak() {
 // --- LOGROS ---
 const achievementDefinitions = {
   'first_short': { title: 'Primer Short', description: '¡Publica tu primer short!', check: (data) => Object.keys(data.calendar || {}).length > 0 },
-  'five_shorts': { title: 'Cinco Shorts', description: '¡Publica cinco shorts!', check: (data) => { let c=0; for(const d in data.calendar) for(const ch in data.calendar[d]) c+=Object.values(data.calendar[d][ch]).filter(s=>s==='done').length; return c>=5; } },
-  'ten_shorts': { title: 'Diez Shorts', description: '¡Publica diez shorts!', check: (data) => { let c=0; for(const d in data.calendar) for(const ch in data.calendar[d]) c+=Object.values(data.calendar[d][ch]).filter(s=>s==='done').length; return c>=10; } },
+  'five_shorts': { title: 'Cinco Shorts', description: '¡Publica cinco shorts!', check: (data) => { let c=0; for(const d in data.calendar) if(data.calendar[d].channels) for(const ch in data.calendar[d].channels) c+=Object.values(data.calendar[d].channels[ch]).filter(s=>s==='done').length; return c>=5; } },
+  'ten_shorts': { title: 'Diez Shorts', description: '¡Publica diez shorts!', check: (data) => { let c=0; for(const d in data.calendar) if(data.calendar[d].channels) for(const ch in data.calendar[d].channels) c+=Object.values(data.calendar[d].channels[ch]).filter(s=>s==='done').length; return c>=10; } },
   'first_streak': { title: 'En Racha', description: '¡Mantén una racha de 3 días!', check: (data) => data.streak >= 3 },
   'seven_streak': { title: 'Racha de la Semana', description: '¡Mantén una racha de 7 días!', check: (data) => data.streak >= 7 },
   'thirty_streak': { title: 'Racha Legendaria', description: '¡Mantén una racha de 30 días!', check: (data) => data.streak >= 30 },
@@ -870,12 +816,6 @@ function init() {
     }
   });
 
-  analyticsButton.addEventListener('click', openAnalyticsModal);
-  subscriberForm.addEventListener('submit', saveSubscriberCounts);
-  closeAnalyticsButton.addEventListener('click', () => analyticsModal.classList.add('hide'));
-
-  dailyLogButton.addEventListener('click', openSubscriberModal);
-
   shortsPerChannelInput.addEventListener('change', updateShortsPerChannel);
 
   settingsButton.addEventListener('click', () => {
@@ -902,6 +842,35 @@ function init() {
   // Eventos para el modal de edición
   editChannelForm.addEventListener('submit', saveChannelEdit);
   closeEditModalButton.addEventListener('click', closeEditModal);
+  
+  // Eventos de Analíticas
+  analyticsButton.addEventListener('click', openAnalyticsModal);
+  dailyLogButton.addEventListener('click', openSubscriberModal);
+  subscriberForm.addEventListener('submit', saveSubscriberCounts);
+  closeAnalyticsButton.addEventListener('click', () => analyticsModal.classList.add('hide'));
+
+  // Evento centralizado para el checklist
+  checklistContainer.addEventListener('click', async (e) => {
+    if (e.target.classList.contains('status-btn')) {
+        const button = e.target;
+        const date = button.dataset.date;
+        const channelName = button.dataset.channel;
+        const shortId = button.dataset.short;
+        const newStatus = button.dataset.status;
+        
+        await updateShortStatus(date, channelName, shortId, newStatus);
+        
+        // Solo recargamos el modal si sigue abierto
+        if (!checklistModal.classList.contains('hide')) {
+            openChecklistModal(date);
+        }
+        
+        renderCalendar();
+        calculateAndDisplayStreak();
+        checkAchievements();
+    }
+  });
+
 
   renderCalendar();
 }
